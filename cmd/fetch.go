@@ -91,6 +91,6 @@ func fetchWalk(path string) error {
 			return filepath.SkipDir
 		}
 
-		return pull(path)
+		return fetch(path)
 	})
 }
