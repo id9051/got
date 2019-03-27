@@ -91,8 +91,12 @@ func pullWalk(path string) error {
 
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 
+		// Usually usually happens when a director is deleted. If exists when filepath.Walk
+		// is called but then the pull removes it. So we get a "No such file or directory"
+		// error. We're returning nil so that processing continues.
 		if err != nil {
-			return errors.Wrapf(err, "error walking filepath [%s]", path)
+			log.Println(errors.Wrapf(err, "error walking filepath [%s]", path).Error())
+			return nil
 		}
 
 		if !info.IsDir() {
