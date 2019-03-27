@@ -1,4 +1,4 @@
-// Copyright © 2016 Jeff Durham <jeffrey.durham@gmail.com>
+// Copyright © 2017 NAME HERE <EMAIL ADDRESS>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,11 +25,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var recursive bool
-
-// pullCmd represents the pull command
-var pullCmd = &cobra.Command{
-	Use:   "pull directory",
+// statusCmd represents the status command
+var statusCmd = &cobra.Command{
+	Use:   "status",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -42,43 +40,42 @@ to quickly create a Cobra application.`,
 			return errors.New("directory argument is required")
 		}
 		if recursive {
-			return pullWalk(args[0])
+			return statusWalk(args[0])
 		}
-		return pull(args[0])
+		return status(args[0])
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(pullCmd)
+	RootCmd.AddCommand(statusCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// pullCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// pullCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	pullCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively pull subdirectories listed")
-
+	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	statusCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively check status of subdirectories listed")
 }
 
-func pull(path string) error {
+func status(path string) error {
 
 	_, err := os.Stat(filepath.Join(path, ".git"))
 	if err != nil {
-
 		if recursive {
 			return nil
 		}
-
 		return errors.Wrapf(err, "[%s] is not a git repository", path)
 	}
 
-	pullCmd := exec.Command("git", fmt.Sprintf("--work-tree=%s", path), fmt.Sprintf("--git-dir=%s", filepath.Join(path, ".git")), "pull")
+	statusCmd := exec.Command("git", fmt.Sprintf("--work-tree=%s", path), fmt.Sprintf("--git-dir=%s", filepath.Join(path, ".git")), "status")
+	statusCmd.Stdout = os.Stdout
+	statusCmd.Stderr = os.Stderr
 
-	if err := pullCmd.Run(); err != nil {
+	if err := statusCmd.Run(); err != nil {
 		log.Printf("[%s]: ERROR %v\n", path, err)
 	} else {
 		log.Printf("[%s]:  Success\n", path)
@@ -87,13 +84,9 @@ func pull(path string) error {
 	return nil
 }
 
-func pullWalk(path string) error {
+func statusWalk(path string) error {
 
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-
-		if err != nil {
-			return errors.Wrapf(err, "error walking filepath [%s]", path)
-		}
 
 		if !info.IsDir() {
 			return nil
@@ -101,6 +94,6 @@ func pullWalk(path string) error {
 			return filepath.SkipDir
 		}
 
-		return pull(path)
+		return status(path)
 	})
 }
