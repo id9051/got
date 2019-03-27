@@ -94,6 +94,10 @@ func walk(path string) error {
 
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 
+		if err != nil {
+			return errors.Wrapf(err, "error walking filepath [%s]", path)
+		}
+
 		if !info.IsDir() {
 			return nil
 		} else if filepath.Base(path) == ".git" {
