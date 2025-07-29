@@ -20,12 +20,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 var recursive bool
+
+var skipList = []string{
+	"princetontmx.com/mobile/tmx-shipper-app",
+	"go/src/github.com/ardanlabs/service-training",
+}
 
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
@@ -66,6 +73,13 @@ func init() {
 
 func pull(path string) error {
 
+	if slices.ContainsFunc(skipList, func(skip string) bool {
+		return strings.Contains(path, skip)
+	}) {
+		log.Printf("Skipping [%s]\n", path)
+		return nil
+	}
+
 	_, err := os.Stat(filepath.Join(path, ".git"))
 	if err != nil {
 
@@ -102,6 +116,11 @@ func pullWalk(path string) error {
 		if !info.IsDir() {
 			return nil
 		} else if filepath.Base(path) == ".git" {
+			return filepath.SkipDir
+		} else if slices.ContainsFunc(skipList, func(skip string) bool {
+			return strings.Contains(path, skip)
+		}) {
+			log.Printf("Skipping [%s]\n", path)
 			return filepath.SkipDir
 		}
 
