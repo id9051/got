@@ -25,13 +25,22 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var recursive bool
 
-var skipList = []string{
-	"princetontmx.com/mobile/tmx-shipper-app",
-	"go/src/github.com/ardanlabs/service-training",
+// getSkipList returns the skip list from configuration, with defaults if not configured
+func getSkipList() []string {
+	skipList := viper.GetStringSlice("skipList")
+	if len(skipList) == 0 {
+		// Default skip list if not configured
+		return []string{
+			"princetontmx.com/mobile/tmx-shipper-app",
+			"go/src/github.com/ardanlabs/service-training",
+		}
+	}
+	return skipList
 }
 
 // pullCmd represents the pull command
@@ -73,6 +82,7 @@ func init() {
 
 func pull(path string) error {
 
+	skipList := getSkipList()
 	if slices.ContainsFunc(skipList, func(skip string) bool {
 		return strings.Contains(path, skip)
 	}) {
@@ -117,7 +127,7 @@ func pullWalk(path string) error {
 			return nil
 		} else if filepath.Base(path) == ".git" {
 			return filepath.SkipDir
-		} else if slices.ContainsFunc(skipList, func(skip string) bool {
+		} else if slices.ContainsFunc(getSkipList(), func(skip string) bool {
 			return strings.Contains(path, skip)
 		}) {
 			log.Printf("Skipping [%s]\n", path)

@@ -1,0 +1,11 @@
+# Example configuration file for 'got' command
+# Place this file as .got.yaml in your home directory or specify with --config flag
+
+# List of directory patterns to skip during recursive operations
+skipList:
+  - "princetontmx.com/mobile/tmx-shipper-app"
+  - "go/src/github.com/ardanlabs/service-training"
+  # Add more patterns as needed:
+  # - "vendor"
+  # - "node_modules"
+  # - "tmp"
