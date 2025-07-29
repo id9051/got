@@ -35,10 +35,7 @@ func getSkipList() []string {
 	skipList := viper.GetStringSlice("skipList")
 	if len(skipList) == 0 {
 		// Default skip list if not configured
-		return []string{
-			"princetontmx.com/mobile/tmx-shipper-app",
-			"go/src/github.com/ardanlabs/service-training",
-		}
+		return []string{}
 	}
 	return skipList
 }
