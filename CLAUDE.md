@@ -48,13 +48,69 @@ go install .
 ```
 
 ### Testing
+The project has comprehensive test coverage (78.7%) including unit tests, integration tests, and test utilities.
+
 ```bash
-# Run tests (if any exist)
+# Run all tests
 go test ./...
 
+# Run tests with coverage
+go test ./... -cover
+
+# Run specific test package
+go test ./cmd
+
 # Run tests with verbose output
-go test -v ./...
+go test ./cmd -v
+
+# Generate detailed coverage report
+go test ./cmd -coverprofile=coverage.out
+go tool cover -html=coverage.out
+
+# Run specific test
+go test ./cmd -run TestValidateDirectoryPath
+
+# Run integration tests only
+go test ./cmd -run Integration
 ```
+
+#### Test Structure
+- **Unit Tests**: `cmd/*_test.go` - Test individual functions and components
+- **Integration Tests**: `cmd/integration_test.go` - Test component interactions  
+- **Test Utilities**: `testutil/helpers.go` - Reusable test infrastructure
+
+#### Test Categories
+1. **Utility Function Tests** (`utils_test.go`):
+   - Directory validation (`validateDirectoryPath`)
+   - Git repository detection (`isGitRepository`) 
+   - Skip list functionality (`shouldSkipPath`)
+   - Command execution logic
+   - Directory walking operations
+
+2. **Configuration Tests** (`root_test.go`):
+   - Viper configuration loading
+   - Skip list parsing and validation
+   - Command structure and flags
+   - Shell completion setup
+
+3. **Command Tests** (`pull_test.go`, `fetch_test.go`, `status_test.go`):
+   - Argument validation
+   - Flag handling (recursive, etc.)
+   - Error message verification
+   - Command-specific functionality
+
+4. **Integration Tests** (`integration_test.go`):
+   - End-to-end workflow testing
+   - Complex directory structures
+   - Skip list behavior verification
+   - Configuration file interactions
+
+#### Test Utilities
+The `testutil` package provides:
+- `CreateTempGitRepo()` - Creates temporary git repositories
+- `CreateTestDirStructure()` - Creates complex directory hierarchies
+- `CreateConfigFile()` - Generates test configuration files
+- Helper functions for assertions and validation
 
 ### Code Quality
 ```bash

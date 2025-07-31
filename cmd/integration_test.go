@@ -1,0 +1,259 @@
+// Copyright © 2025 Jeff Durham <jeffrey.durham@gmail.com>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package cmd
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/id9051/got/testutil"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestRecursiveOperations_Integration(t *testing.T) {
+	// Save and restore viper state
+	originalConfig := viper.AllSettings()
+	defer func() {
+		viper.Reset()
+		for key, value := range originalConfig {
+			viper.Set(key, value)
+		}
+	}()
+
+	// Create test structure
+	rootPath, repos := testutil.CreateAdvancedTestStructure(t)
+	
+	// Configure skip list to match our test structure
+	skipList := []string{"node_modules", ".git", "vendor", "skip-me"}
+	viper.Reset()
+	viper.Set("skipList", skipList)
+	
+	t.Run("walkDirectories processes all directories", func(t *testing.T) {
+		var processedPaths []string
+		testOperation := func(path string) error {
+			processedPaths = append(processedPaths, path)
+			return nil
+		}
+		
+		err := walkDirectories(rootPath, testOperation)
+		assert.NoError(t, err)
+		
+		// Should have processed the root directory
+		assert.Contains(t, processedPaths, rootPath)
+		
+		// Should have processed some directories (exact count depends on skip logic)
+		assert.Greater(t, len(processedPaths), 1)
+	})
+	
+	t.Run("git repositories are identified correctly", func(t *testing.T) {
+		gitRepos := testutil.FilterGitRepos(repos)
+		nonGitRepos := make([]testutil.GitRepoInfo, 0)
+		
+		for _, repo := range repos {
+			if !repo.IsGit {
+				nonGitRepos = append(nonGitRepos, repo)
+			}
+		}
+		
+		// Test git repository detection
+		for _, repo := range gitRepos {
+			assert.True(t, isGitRepository(repo.Path), "Should detect git repo: %s", repo.Path)
+		}
+		
+		// Test non-git directory detection
+		for _, repo := range nonGitRepos {
+			assert.False(t, isGitRepository(repo.Path), "Should not detect as git repo: %s", repo.Path)
+		}
+	})
+	
+	t.Run("skip list works correctly", func(t *testing.T) {
+		testCases := []struct {
+			path     string
+			expected bool
+		}{
+			{filepath.Join(rootPath, "repo1"), false},
+			{filepath.Join(rootPath, "node_modules/package"), true},
+			{filepath.Join(rootPath, "vendor/github.com"), true},
+			{filepath.Join(rootPath, "skip-me"), true},
+			{filepath.Join(rootPath, "normal/repo"), false},
+		}
+		
+		for _, tc := range testCases {
+			result := shouldSkipPath(tc.path)
+			assert.Equal(t, tc.expected, result, "Skip check failed for path: %s", tc.path)
+		}
+	})
+}
+
+func TestFullCommandExecution_Integration(t *testing.T) {
+	// Create a simpler test structure for command execution
+	_, dirs := testutil.CreateTestDirStructure(t)
+	
+	t.Run("single functions work correctly", func(t *testing.T) {
+		repo1Path := dirs["repo1"]
+		testutil.AssertIsGitRepo(t, repo1Path)
+		
+		// Test single functions directly
+		err := pullSingle(repo1Path)
+		assert.NoError(t, err) // Should not error even if git fails
+		
+		err = fetchSingle(repo1Path)
+		assert.NoError(t, err) // Should not error even if git fails
+		
+		err = statusSingle(repo1Path)
+		assert.NoError(t, err) // Should not error even if git fails
+	})
+	
+	t.Run("single functions fail with non-git repo", func(t *testing.T) {
+		nonRepoPath := dirs["nonrepo"]
+		
+		// All single functions should fail with non-git directory
+		err := pullSingle(nonRepoPath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "is not a git repository")
+		
+		err = fetchSingle(nonRepoPath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "is not a git repository")
+		
+		err = statusSingle(nonRepoPath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "is not a git repository")
+	})
+}
+
+func TestRecursiveFlag_Integration(t *testing.T) {
+	// Save and restore viper state
+	originalConfig := viper.AllSettings()
+	defer func() {
+		viper.Reset()
+		for key, value := range originalConfig {
+			viper.Set(key, value)
+		}
+	}()
+
+	rootPath, _ := testutil.CreateTestDirStructure(t)
+	
+	// Set empty skip list for predictable behavior
+	viper.Reset()
+	viper.Set("skipList", []string{})
+	
+	t.Run("recursive flag is available", func(t *testing.T) {
+		// Test that the recursive flag exists on the root command
+		recursiveFlag := RootCmd.PersistentFlags().Lookup("recursive")
+		assert.NotNil(t, recursiveFlag)
+		assert.Equal(t, "r", recursiveFlag.Shorthand)
+	})
+	
+	t.Run("walk operations work", func(t *testing.T) {
+		// Test that walkDirectories function works correctly
+		var processedPaths []string
+		testOperation := func(path string) error {
+			processedPaths = append(processedPaths, path)
+			return nil
+		}
+		
+		err := walkDirectories(rootPath, testOperation)
+		assert.NoError(t, err)
+		assert.Greater(t, len(processedPaths), 0)
+		assert.Contains(t, processedPaths, rootPath)
+	})
+}
+
+func TestConfigurationIntegration(t *testing.T) {
+	// Save and restore viper state
+	originalConfig := viper.AllSettings()
+	defer func() {
+		viper.Reset()
+		for key, value := range originalConfig {
+			viper.Set(key, value)
+		}
+	}()
+
+	t.Run("configuration file loading affects skip behavior", func(t *testing.T) {
+		// Create test structure
+		rootPath, _ := testutil.CreateAdvancedTestStructure(t)
+		
+		// Create config with specific skip list
+		configContent := `skipList:
+  - node_modules
+  - vendor
+  - .git`
+		configFile := testutil.CreateConfigFile(t, configContent)
+		
+		// Set config file and initialize
+		viper.Reset()
+		cfgFile = configFile
+		defer func() { cfgFile = "" }()
+		initConfig()
+		
+		// Test that skip list is loaded correctly
+		skipList := getSkipList()
+		expected := []string{"node_modules", "vendor", ".git"}
+		assert.Equal(t, expected, skipList)
+		
+		// Test that paths are skipped correctly
+		assert.True(t, shouldSkipPath(filepath.Join(rootPath, "node_modules/package")))
+		assert.True(t, shouldSkipPath(filepath.Join(rootPath, "vendor/lib")))
+		assert.False(t, shouldSkipPath(filepath.Join(rootPath, "normal/repo")))
+	})
+}
+
+func TestErrorHandling_Integration(t *testing.T) {
+	t.Run("invalid directory paths are handled by validation", func(t *testing.T) {
+		invalidPaths := []string{
+			"/path/that/does/not/exist",
+			"",
+			"go.mod", // file instead of directory
+		}
+		
+		for _, path := range invalidPaths {
+			err := validateDirectoryPath(path)
+			assert.Error(t, err, "Should error for invalid path: %s", path)
+		}
+	})
+	
+	t.Run("validation works correctly", func(t *testing.T) {
+		// Current directory should be valid
+		err := validateDirectoryPath(".")
+		assert.NoError(t, err)
+		
+		// Temp directory should be valid
+		tempDir := testutil.CreateTempNonGitDir(t)
+		err = validateDirectoryPath(tempDir)
+		assert.NoError(t, err)
+	})
+}
+
+func TestDeprecatedFunctions_Integration(t *testing.T) {
+	// Test that deprecated walk functions still work for backward compatibility
+	rootPath := testutil.CreateTempGitRepo(t)
+	
+	t.Run("deprecated pullWalk function", func(t *testing.T) {
+		err := pullWalk(rootPath)
+		assert.NoError(t, err)
+	})
+	
+	t.Run("deprecated fetchWalk function", func(t *testing.T) {
+		err := fetchWalk(rootPath)
+		assert.NoError(t, err)
+	})
+	
+	t.Run("deprecated statusWalk function", func(t *testing.T) {
+		err := statusWalk(rootPath)
+		assert.NoError(t, err)
+	})
+}
