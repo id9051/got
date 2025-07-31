@@ -24,16 +24,29 @@ import (
 
 var cfgFile string
 
+// getSkipList returns the skip list from configuration, with defaults if not configured
+func getSkipList() []string {
+	skipList := viper.GetStringSlice("skipList")
+	if len(skipList) == 0 {
+		// Default skip list if not configured
+		return []string{}
+	}
+	return skipList
+}
+
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "got",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "Git repository management tool",
+	Long: `Got is a CLI tool for managing multiple Git repositories.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+It allows you to perform git operations (pull, fetch, status) across single 
+repositories or recursively across directory trees containing multiple git 
+repositories. Use the --recursive flag to operate on all repositories found 
+in subdirectories.
+
+Configure directories to skip during recursive operations by creating a 
+.got.yaml file in your home directory with a skipList array.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -55,6 +68,7 @@ func init() {
 	// Cobra supports Persistent Flags, which, if defined here,
 	// will be global for your application.
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.got.yaml)")
+	RootCmd.PersistentFlags().BoolP("recursive", "r", false, "Recursively operate on subdirectories")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

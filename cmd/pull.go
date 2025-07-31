@@ -25,39 +25,34 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
-
-var recursive bool
-
-// getSkipList returns the skip list from configuration, with defaults if not configured
-func getSkipList() []string {
-	skipList := viper.GetStringSlice("skipList")
-	if len(skipList) == 0 {
-		// Default skip list if not configured
-		return []string{}
-	}
-	return skipList
-}
 
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
 	Use:   "pull directory",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Pull changes from remote repositories",
+	Long: `Pull changes from remote repositories in the specified directory.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+If the --recursive flag is used, got will walk through all subdirectories
+and pull changes from any Git repositories found. Directories specified
+in the skip list configuration will be ignored during recursive operations.
+
+Examples:
+  got pull .                    # Pull changes in current directory
+  got pull /path/to/repo        # Pull changes in specific directory
+  got pull -r /path/to/projects # Recursively pull all repositories`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("directory argument is required")
 		}
+		recursive, err := cmd.Flags().GetBool("recursive")
+		if err != nil {
+			return errors.Wrap(err, "failed to get recursive flag")
+		}
 		if recursive {
 			return pullWalk(args[0])
 		}
-		return pull(args[0])
+		return pull(args[0], recursive)
 	},
 }
 
@@ -73,11 +68,10 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// pullCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	pullCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively pull subdirectories listed")
 
 }
 
-func pull(path string) error {
+func pull(path string, recursive bool) error {
 
 	skipList := getSkipList()
 	if slices.ContainsFunc(skipList, func(skip string) bool {
@@ -131,6 +125,6 @@ func pullWalk(path string) error {
 			return filepath.SkipDir
 		}
 
-		return pull(path)
+		return pull(path, true)
 	})
 }

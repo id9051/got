@@ -19,6 +19,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -27,21 +29,29 @@ import (
 // fetchCmd represents the fetch command
 var fetchCmd = &cobra.Command{
 	Use:   "fetch directory",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Fetch changes from remote repositories",
+	Long: `Fetch changes from remote repositories in the specified directory without merging.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+If the --recursive flag is used, got will walk through all subdirectories
+and fetch changes from any Git repositories found. Directories specified
+in the skip list configuration will be ignored during recursive operations.
+
+Examples:
+  got fetch .                    # Fetch changes in current directory
+  got fetch /path/to/repo        # Fetch changes in specific directory
+  got fetch -r /path/to/projects # Recursively fetch all repositories`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("directory argument is required")
 		}
+		recursive, err := cmd.Flags().GetBool("recursive")
+		if err != nil {
+			return errors.Wrap(err, "failed to get recursive flag")
+		}
 		if recursive {
 			return fetchWalk(args[0])
 		}
-		return fetch(args[0])
+		return fetch(args[0], recursive)
 	},
 }
 
@@ -57,10 +67,17 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// fetchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	fetchCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively fetch subdirectories listed")
 }
 
-func fetch(path string) error {
+func fetch(path string, recursive bool) error {
+
+	skipList := getSkipList()
+	if slices.ContainsFunc(skipList, func(skip string) bool {
+		return strings.Contains(path, skip)
+	}) {
+		log.Printf("Skipping [%s]\n", path)
+		return nil
+	}
 
 	_, err := os.Stat(filepath.Join(path, ".git"))
 	if err != nil {
@@ -85,16 +102,25 @@ func fetchWalk(path string) error {
 
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 
+		// Usually happens when a directory is deleted. If exists when filepath.Walk
+		// is called but then the fetch removes it. So we get a "No such file or directory"
+		// error. We're returning nil so that processing continues.
 		if err != nil {
-			return errors.Wrapf(err, "error walking filepath [%s]", path)
+			log.Println(errors.Wrapf(err, "error walking filepath [%s]", path).Error())
+			return nil
 		}
 
 		if !info.IsDir() {
 			return nil
 		} else if filepath.Base(path) == ".git" {
 			return filepath.SkipDir
+		} else if slices.ContainsFunc(getSkipList(), func(skip string) bool {
+			return strings.Contains(path, skip)
+		}) {
+			log.Printf("Skipping [%s]\n", path)
+			return filepath.SkipDir
 		}
 
-		return fetch(path)
+		return fetch(path, true)
 	})
 }
