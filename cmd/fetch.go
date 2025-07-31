@@ -14,14 +14,6 @@
 package cmd
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"slices"
-	"strings"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -44,14 +36,23 @@ Examples:
 		if len(args) < 1 {
 			return errors.New("directory argument is required")
 		}
-		recursive, err := cmd.Flags().GetBool("recursive")
+		
+		// Validate directory path
+		if err := validateDirectoryPath(args[0]); err != nil {
+			return err
+		}
+		
+		recursive, err := cmd.Flags().GetBool(RecursiveFlagName)
 		if err != nil {
 			return errors.Wrap(err, "failed to get recursive flag")
 		}
+		
 		if recursive {
-			return fetchWalk(args[0])
+			return walkDirectories(args[0], func(path string) error {
+				return executeGitCommand(path, "fetch")
+			})
 		}
-		return fetch(args[0], recursive)
+		return fetchSingle(args[0])
 	},
 }
 
@@ -69,58 +70,19 @@ func init() {
 	// fetchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func fetch(path string, recursive bool) error {
-
-	skipList := getSkipList()
-	if slices.ContainsFunc(skipList, func(skip string) bool {
-		return strings.Contains(path, skip)
-	}) {
-		log.Printf("Skipping [%s]\n", path)
+// fetchSingle performs git fetch on a single directory
+func fetchSingle(path string) error {
+	if shouldSkipPath(path) {
+		logSkipped(path)
 		return nil
 	}
-
-	_, err := os.Stat(filepath.Join(path, ".git"))
-	if err != nil {
-		if recursive {
-			return nil
-		}
-		return errors.Wrapf(err, "[%s] is not a git repository", path)
-	}
-
-	fetchCmd := exec.Command("git", fmt.Sprintf("--work-tree=%s", path), fmt.Sprintf("--git-dir=%s", filepath.Join(path, ".git")), "fetch")
-
-	if err := fetchCmd.Run(); err != nil {
-		log.Printf("[%s]: ERROR %v\n", path, err)
-	} else {
-		log.Printf("[%s]:  Success\n", path)
-	}
-
-	return nil
+	return executeGitCommandSingle(path, "fetch")
 }
 
+// fetchWalk is deprecated - functionality moved to walkDirectories in utils.go
+// Kept for backward compatibility but now just calls the generic walker
 func fetchWalk(path string) error {
-
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-
-		// Usually happens when a directory is deleted. If exists when filepath.Walk
-		// is called but then the fetch removes it. So we get a "No such file or directory"
-		// error. We're returning nil so that processing continues.
-		if err != nil {
-			log.Println(errors.Wrapf(err, "error walking filepath [%s]", path).Error())
-			return nil
-		}
-
-		if !info.IsDir() {
-			return nil
-		} else if filepath.Base(path) == ".git" {
-			return filepath.SkipDir
-		} else if slices.ContainsFunc(getSkipList(), func(skip string) bool {
-			return strings.Contains(path, skip)
-		}) {
-			log.Printf("Skipping [%s]\n", path)
-			return filepath.SkipDir
-		}
-
-		return fetch(path, true)
+	return walkDirectories(path, func(path string) error {
+		return executeGitCommand(path, "fetch")
 	})
 }
