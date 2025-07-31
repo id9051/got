@@ -230,13 +230,32 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 	inProgressMode = true
 	gitOutputBuffer = []GitOutput{}
 	
-	// First, count total directories for progress bar
+	// First, count total directories for progress bar (applying same optimization logic)
 	totalDirs := 0
 	var skipCount int
 	filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
-		if err == nil && info.IsDir() && filepath.Base(path) != GitDirName {
-			totalDirs++
+		if err != nil || !info.IsDir() {
+			return nil
 		}
+		
+		// Skip .git directories
+		if filepath.Base(path) == GitDirName {
+			return filepath.SkipDir
+		}
+		
+		// Skip paths in skip list during counting too
+		if shouldSkipPath(path) {
+			return filepath.SkipDir
+		}
+		
+		// Count this directory
+		totalDirs++
+		
+		// If this is a git repository, skip its subdirectories in counting
+		if isGitRepository(path) {
+			return filepath.SkipDir
+		}
+		
 		return nil
 	})
 	
@@ -288,9 +307,13 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 		// Check if this is a git repository before applying operation
 		if isGit {
 			gitRepoCount++
+			// Apply git operation
+			gitOperation(path)
+			// Skip subdirectories of git repositories since we only operate on repo roots
+			return filepath.SkipDir
 		}
 
-		// Apply git operation
+		// Apply git operation to non-git directories (will be skipped silently)
 		return gitOperation(path)
 	})
 	
