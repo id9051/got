@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,7 +32,18 @@ func getSkipList() []string {
 		// Default skip list if not configured
 		return []string{}
 	}
-	return skipList
+	
+	// Validate and clean skip list entries
+	validSkipList := make([]string, 0, len(skipList))
+	for _, skip := range skipList {
+		// Remove empty strings and whitespace-only entries
+		skip = strings.TrimSpace(skip)
+		if skip != "" {
+			validSkipList = append(validSkipList, skip)
+		}
+	}
+	
+	return validSkipList
 }
 
 // RootCmd represents the base command when called without any subcommands
@@ -70,9 +82,14 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.got.yaml)")
 	RootCmd.PersistentFlags().BoolP("recursive", "r", false, "Recursively operate on subdirectories")
 
+	// Enable completion command
+	RootCmd.CompletionOptions.DisableDefaultCmd = false
+	RootCmd.CompletionOptions.DisableNoDescFlag = false
+	RootCmd.CompletionOptions.DisableDescriptions = false
+
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // initConfig reads in config file and ENV variables if set.

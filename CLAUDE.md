@@ -11,23 +11,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Core Structure
 - **Entry Point**: `main.go` - Simple entry point that calls `cmd.Execute()`
 - **Command Layer**: `cmd/` directory contains all CLI commands
-  - `root.go` - Root command setup, configuration initialization, and global flags
-  - `pull.go` - Git pull operations with recursive directory walking
-  - `fetch.go` - Git fetch operations with recursive directory walking  
-  - `status.go` - Git status operations with recursive directory walking
+  - `root.go` - Root command setup, configuration initialization, shared utilities, and global flags
+  - `utils.go` - Shared utilities for validation, git operations, logging, and directory walking
+  - `pull.go` - Git pull command implementation (simplified, uses shared utilities)
+  - `fetch.go` - Git fetch command implementation (simplified, uses shared utilities)  
+  - `status.go` - Git status command implementation (simplified, uses shared utilities)
 
 ### Key Design Patterns
+- **Shared Utilities Architecture**: Common functionality centralized in `utils.go`
 - **Cobra Commands**: Each git operation is implemented as a separate Cobra command
-- **Shared Recursive Logic**: All commands support `-r/--recursive` flag for directory tree operations
-- **Configuration Management**: Uses Viper to load `.got.yaml` config files with skip list functionality
-- **Directory Walking**: Uses `filepath.Walk` for recursive operations with configurable skip patterns
+- **Generic Directory Walker**: Single `walkDirectories()` function handles all recursive operations
+- **Dual Operation Modes**: Separate functions for single directory vs recursive operations
+- **Input Validation**: Comprehensive directory path validation with clear error messages
+- **Configuration Management**: Uses Viper to load `.got.yaml` config files with skip list validation
 - **Error Handling**: Extensive use of `github.com/pkg/errors` for error wrapping and context
 
 ### Configuration System
 - Config file: `.got.yaml` (default location: `$HOME/.got.yaml`)
 - Override with `--config` flag
 - Key configuration: `skipList` array for directories to skip during recursive operations
-- Default skip list is now empty (configurable via `getSkipList()` in `cmd/pull.go:34`)
+- Configuration validation: Empty and whitespace-only entries are automatically filtered
+- Default skip list is now empty (configurable via `getSkipList()` in `cmd/root.go:28`)
 
 ## Development Commands
 
@@ -70,16 +74,25 @@ go mod verify
 ### Command Structure
 All commands follow the pattern: `got [command] [directory] [flags]`
 
-### Recursive Operations
-- The `recursive` variable in `cmd/pull.go:31` is shared across commands
-- Recursive logic uses `filepath.Walk` with skip directory functionality
+### Dual Operation Modes
+- **Single Directory Mode**: `executeGitCommandSingle()` - Requires target to be a git repository
+- **Recursive Mode**: `executeGitCommand()` - Silently skips non-git directories during tree walking
+- Input validation ensures directory exists and is accessible before operations begin
+
+### Recursive Operations  
+- Generic `walkDirectories()` function in `cmd/utils.go:150` handles all recursive operations
+- Progress indicators show scanning progress and completion summary
 - Skip patterns are checked using `strings.Contains()` for flexible matching
+- Robust error handling continues processing even when individual operations fail
 
 ### Git Operations
-- All git commands use `exec.Command` with explicit `--work-tree` and `--git-dir` flags
-- Error handling logs failures but continues processing in recursive mode
-- Non-git directories are silently skipped in recursive mode
+- All git commands use `runGitCommand()` with explicit `--work-tree` and `--git-dir` flags
+- Status command output is directed to stdout/stderr for user visibility
+- Error handling logs failures but continues processing other repositories
+- Constants defined for all magic strings to prevent typos
 
-### Error Recovery
-- `pullWalk()` in `cmd/pull.go:111` includes special handling for directories that are deleted during processing
-- Implements defensive programming against race conditions during recursive operations
+### Error Recovery and Validation
+- Comprehensive input validation with clear, user-friendly error messages
+- Race condition handling for directories deleted during recursive operations
+- Configuration validation automatically filters invalid skip list entries
+- Defensive programming throughout with proper error wrapping and context

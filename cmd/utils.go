@@ -148,7 +148,13 @@ func runGitCommand(path string, gitArgs ...string) error {
 
 // walkDirectories is a generic function for walking directories and applying git operations
 func walkDirectories(rootPath string, gitOperation func(string) error) error {
-	return filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+	// Show initial progress message for recursive operations
+	log.Printf("Recursively scanning directories under %s...", rootPath)
+	
+	dirCount := 0
+	gitRepoCount := 0
+	
+	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		// Handle walking errors (e.g., deleted directories during walk)
 		if err != nil {
 			log.Println(errors.Wrapf(err, ErrorWalkingMessage, path).Error())
@@ -159,6 +165,8 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 		if !info.IsDir() {
 			return nil
 		}
+		
+		dirCount++
 
 		// Skip .git directories
 		if filepath.Base(path) == GitDirName {
@@ -171,7 +179,21 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 			return filepath.SkipDir
 		}
 
+		// Check if this is a git repository before applying operation
+		if isGitRepository(path) {
+			gitRepoCount++
+		}
+
 		// Apply git operation
 		return gitOperation(path)
 	})
+	
+	// Show completion summary
+	if gitRepoCount > 0 {
+		log.Printf("Completed recursive operation on %d git repositories (scanned %d directories)", gitRepoCount, dirCount)
+	} else {
+		log.Printf("No git repositories found (scanned %d directories)", dirCount)
+	}
+	
+	return err
 }
