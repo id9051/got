@@ -28,14 +28,33 @@ var cfgFile string
 // getSkipList returns the skip list from configuration, with defaults if not configured
 func getSkipList() []string {
 	skipList := viper.GetStringSlice("skipList")
-	if len(skipList) == 0 {
-		// Default skip list if not configured
-		return []string{}
+	
+	// Check if user wants to disable default skips (defaults to true)
+	useDefaults := true
+	if viper.IsSet("useDefaultSkips") {
+		useDefaults = viper.GetBool("useDefaultSkips")
 	}
 	
-	// Validate and clean skip list entries
-	validSkipList := make([]string, 0, len(skipList))
+	// Default directories that are commonly skipped
+	defaultSkips := []string{"node_modules", "vendor", ".git"}
+	
+	// Merge with configured skip list
+	skipMap := make(map[string]bool)
+	
+	// Only add defaults if enabled
+	if useDefaults {
+		for _, skip := range defaultSkips {
+			skipMap[skip] = true
+		}
+	}
+	
 	for _, skip := range skipList {
+		skipMap[skip] = true
+	}
+	
+	// Convert map back to slice
+	validSkipList := make([]string, 0, len(skipMap))
+	for skip := range skipMap {
 		// Remove empty strings and whitespace-only entries
 		skip = strings.TrimSpace(skip)
 		if skip != "" {
@@ -57,8 +76,12 @@ repositories or recursively across directory trees containing multiple git
 repositories. Use the --recursive flag to operate on all repositories found 
 in subdirectories.
 
-Configure directories to skip during recursive operations by creating a 
-.got.yaml file in your home directory with a skipList array.`,
+Configuration (.got.yaml in your home directory):
+  skipList: ["custom_dir", "temp"]           # Custom directories to skip
+  useDefaultSkips: true                      # Include defaults (node_modules, vendor, .git)
+
+By default, common directories (node_modules, vendor, .git) are automatically 
+skipped. Set useDefaultSkips: false to disable this behavior.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -68,13 +91,16 @@ Configure directories to skip during recursive operations by creating a
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		fmt.Println(styleError("Error", err))
 		os.Exit(-1)
 	}
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	// Set custom help function
+	RootCmd.SetHelpFunc(styledHelp)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports Persistent Flags, which, if defined here,
@@ -104,6 +130,6 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+		fmt.Println(styleInfo("Using config file: " + stylePath(viper.ConfigFileUsed())))
 	}
 }

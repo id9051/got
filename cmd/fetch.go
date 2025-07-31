@@ -26,12 +26,10 @@ var fetchCmd = &cobra.Command{
 
 If the --recursive flag is used, got will walk through all subdirectories
 and fetch changes from any Git repositories found. Directories specified
-in the skip list configuration will be ignored during recursive operations.
-
-Examples:
-  got fetch .                    # Fetch changes in current directory
-  got fetch /path/to/repo        # Fetch changes in specific directory
-  got fetch -r /path/to/projects # Recursively fetch all repositories`,
+in the skip list configuration will be ignored during recursive operations.`,
+	Example: `got fetch .                    # Fetch changes in current directory
+got fetch /path/to/repo        # Fetch changes in specific directory
+got fetch -r /path/to/projects # Recursively fetch all repositories`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("directory argument is required")
@@ -58,6 +56,7 @@ Examples:
 
 func init() {
 	RootCmd.AddCommand(fetchCmd)
+	fetchCmd.SetHelpFunc(styledHelp)
 
 	// Here you will define your flags and configuration settings.
 

@@ -27,12 +27,10 @@ var pullCmd = &cobra.Command{
 
 If the --recursive flag is used, got will walk through all subdirectories
 and pull changes from any Git repositories found. Directories specified
-in the skip list configuration will be ignored during recursive operations.
-
-Examples:
-  got pull .                    # Pull changes in current directory
-  got pull /path/to/repo        # Pull changes in specific directory
-  got pull -r /path/to/projects # Recursively pull all repositories`,
+in the skip list configuration will be ignored during recursive operations.`,
+	Example: `got pull .                    # Pull changes in current directory
+got pull /path/to/repo        # Pull changes in specific directory
+got pull -r /path/to/projects # Recursively pull all repositories`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("directory argument is required")
@@ -59,6 +57,7 @@ Examples:
 
 func init() {
 	RootCmd.AddCommand(pullCmd)
+	pullCmd.SetHelpFunc(styledHelp)
 
 	// Here you will define your flags and configuration settings.
 

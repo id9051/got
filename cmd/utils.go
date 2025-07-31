@@ -16,12 +16,12 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -86,18 +86,28 @@ func shouldSkipPath(path string) bool {
 
 // logSkipped logs that a path was skipped
 func logSkipped(path string) {
-	log.Printf(SkippingMessage+"\n", path)
+	fmt.Println(styleSkipped(path))
 }
 
 // logSuccess logs successful operation
 func logSuccess(path string) {
-	log.Printf(SuccessMessage+"\n", path)
+	fmt.Println(styleSuccess(path))
 }
 
 // logError logs error from operation
 func logError(path string, err error) {
-	log.Printf(ErrorMessage+"\n", path, err)
+	fmt.Println(styleError(path, err))
 }
+
+// GitOutput stores the output of a git command for later display
+type GitOutput struct {
+	Path   string
+	Output string
+	Error  error
+}
+
+var gitOutputBuffer []GitOutput
+var inProgressMode bool
 
 // executeGitCommand executes a git command in the specified directory
 // For recursive operations - silently skips non-git directories
@@ -131,25 +141,115 @@ func runGitCommand(path string, gitArgs ...string) error {
 
 	gitCmd := exec.Command("git", args...)
 	
-	// For status command, we want to show output to user
+	// For status command, we want to show output to user but need to handle progress bar
+	var output []byte
+	var err error
 	if len(gitArgs) > 0 && gitArgs[0] == "status" {
-		gitCmd.Stdout = os.Stdout
-		gitCmd.Stderr = os.Stderr
+		// Capture output instead of sending directly to stdout to avoid interfering with progress bar
+		output, err = gitCmd.CombinedOutput()
 	}
 
-	if err := gitCmd.Run(); err != nil {
+	// Show operation in progress
+	operation := "operation"
+	if len(gitArgs) > 0 {
+		operation = gitArgs[0]
+	}
+	
+	// Start spinner for non-status commands
+	spinner := NewSpinner()
+	done := make(chan bool)
+	
+	if operation != "status" {
+		if !inProgressMode {
+			// Only show spinner when not in progress mode
+			go func() {
+				ticker := time.NewTicker(100 * time.Millisecond)
+				defer ticker.Stop()
+				
+				for {
+					select {
+					case <-done:
+						fmt.Print("\r\033[K") // Clear line
+						return
+					case <-ticker.C:
+						fmt.Printf("\r%s %s %s", 
+							spinner.Next(),
+							infoStyle.Render("Running git "+operation+" on"),
+							pathStyle.Render(path))
+					}
+				}
+			}()
+		}
+		
+		// Run the command for non-status operations
+		err = gitCmd.Run()
+		close(done)
+		
+		if !inProgressMode {
+			time.Sleep(50 * time.Millisecond) // Brief pause to ensure spinner cleanup
+			fmt.Print("\r\033[K") // Clear line
+		}
+	}
+	// For status commands, output was already captured above
+
+	if err != nil {
 		logError(path, err)
 		return nil // Don't stop processing other repositories
 	}
 
-	logSuccess(path)
+	// Handle output display based on mode
+	if operation == "status" && len(output) > 0 {
+		if inProgressMode {
+			// Buffer the output for later display
+			gitOutputBuffer = append(gitOutputBuffer, GitOutput{
+				Path:   path,
+				Output: string(output),
+				Error:  nil,
+			})
+		} else {
+			// Display immediately for single operations
+			fmt.Print(string(output))
+		}
+	}
+
+	// Always log success, but handle it differently in progress mode
+	if inProgressMode {
+		// In progress mode, print success immediately after clearing progress line
+		fmt.Print("\r\033[K") // Clear progress line
+		logSuccess(path)
+		// Let the progress bar re-render on next update
+	} else {
+		logSuccess(path)
+	}
 	return nil
 }
 
 // walkDirectories is a generic function for walking directories and applying git operations
 func walkDirectories(rootPath string, gitOperation func(string) error) error {
-	// Show initial progress message for recursive operations
-	log.Printf("Recursively scanning directories under %s...", rootPath)
+	// Enable progress mode and clear output buffer
+	inProgressMode = true
+	gitOutputBuffer = []GitOutput{}
+	
+	// First, count total directories for progress bar
+	totalDirs := 0
+	var skipCount int
+	filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if err == nil && info.IsDir() && filepath.Base(path) != GitDirName {
+			totalDirs++
+		}
+		return nil
+	})
+	
+	// Show initial progress message
+	fmt.Println(styleProgress("Recursively scanning directories under " + stylePath(rootPath) + "..."))
+	fmt.Printf(styleInfo("Found %s directories to process"), numberStyle.Render(fmt.Sprintf("%d", totalDirs)))
+	fmt.Println()
+	fmt.Println()
+	
+	// Create progress tracker
+	progress := NewProgressTracker()
+	progress.SetTotal(totalDirs)
+	progress.Start()
 	
 	dirCount := 0
 	gitRepoCount := 0
@@ -157,7 +257,7 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		// Handle walking errors (e.g., deleted directories during walk)
 		if err != nil {
-			log.Println(errors.Wrapf(err, ErrorWalkingMessage, path).Error())
+			fmt.Println(styleError(path, errors.Wrapf(err, "error walking filepath")))
 			return nil // Continue processing
 		}
 
@@ -173,14 +273,20 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 			return filepath.SkipDir
 		}
 
+		// Update progress
+		isGit := isGitRepository(path)
+		progress.Update(path, isGit)
+
 		// Skip paths in skip list
 		if shouldSkipPath(path) {
-			logSkipped(path)
+			// Show skip message through progress tracker
+			progress.ShowMessage(styleSkipped(path))
+			skipCount++
 			return filepath.SkipDir
 		}
 
 		// Check if this is a git repository before applying operation
-		if isGitRepository(path) {
+		if isGit {
 			gitRepoCount++
 		}
 
@@ -188,11 +294,48 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 		return gitOperation(path)
 	})
 	
+	// Finish progress display
+	progress.Finish()
+	
+	// Disable progress mode
+	inProgressMode = false
+	
+	// Display buffered git outputs
+	if len(gitOutputBuffer) > 0 {
+		fmt.Println() // Add space after progress
+		for _, output := range gitOutputBuffer {
+			if output.Error != nil {
+				logError(output.Path, output.Error)
+			} else {
+				fmt.Print(output.Output)
+				logSuccess(output.Path)
+			}
+		}
+	}
+	
 	// Show completion summary
+	fmt.Println() // Add space after progress
+	
+	summaryMsg := ""
 	if gitRepoCount > 0 {
-		log.Printf("Completed recursive operation on %d git repositories (scanned %d directories)", gitRepoCount, dirCount)
+		summaryMsg = fmt.Sprintf("Completed recursive operation on %s git repositories (scanned %s directories", 
+			numberStyle.Render(fmt.Sprintf("%d", gitRepoCount)), 
+			numberStyle.Render(fmt.Sprintf("%d", dirCount)))
 	} else {
-		log.Printf("No git repositories found (scanned %d directories)", dirCount)
+		summaryMsg = fmt.Sprintf("No git repositories found (scanned %s directories", 
+			numberStyle.Render(fmt.Sprintf("%d", dirCount)))
+	}
+	
+	// Add skip count if any
+	if skipCount > 0 {
+		summaryMsg += fmt.Sprintf(", skipped %s", numberStyle.Render(fmt.Sprintf("%d", skipCount)))
+	}
+	summaryMsg += ")"
+	
+	if gitRepoCount > 0 {
+		fmt.Println(styleSummary(summaryMsg))
+	} else {
+		fmt.Println(styleInfo(summaryMsg))
 	}
 	
 	return err
