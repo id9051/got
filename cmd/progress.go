@@ -35,6 +35,10 @@ type ProgressTracker struct {
 	lastUpdate     time.Time
 	updateInterval time.Duration
 	showProgress   bool
+	startTime      time.Time
+	lastETAUpdate  time.Time
+	etaUpdateInterval time.Duration
+	cachedETA      string
 }
 
 // NewProgressTracker creates a new progress tracker
@@ -54,6 +58,8 @@ func NewProgressTracker() *ProgressTracker {
 		prog:           prog,
 		updateInterval: 50 * time.Millisecond, // Faster updates for better visibility
 		showProgress:   true,
+		etaUpdateInterval: 1 * time.Second,   // Update ETA every second to avoid flickering
+		cachedETA:      "calculating...",
 	}
 }
 
@@ -68,7 +74,10 @@ func (pt *ProgressTracker) SetTotal(total int) {
 func (pt *ProgressTracker) Start() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	pt.lastUpdate = time.Now()
+	now := time.Now()
+	pt.startTime = now
+	pt.lastUpdate = now
+	pt.lastETAUpdate = now
 	if pt.showProgress {
 		// Hide cursor
 		fmt.Print("\033[?25l") // Hide cursor
@@ -108,6 +117,42 @@ func (pt *ProgressTracker) Finish() {
 	}
 }
 
+// calculateETA calculates estimated time remaining
+func (pt *ProgressTracker) calculateETA() string {
+	if pt.current == 0 || pt.total == 0 {
+		return "calculating..."
+	}
+
+	elapsed := time.Since(pt.startTime)
+	if elapsed < time.Second {
+		return "calculating..."
+	}
+
+	// Calculate rate (items per second)
+	rate := float64(pt.current) / elapsed.Seconds()
+	if rate == 0 {
+		return "calculating..."
+	}
+
+	// Calculate remaining items and time
+	remaining := pt.total - pt.current
+	if remaining <= 0 {
+		return "0s"
+	}
+
+	etaSeconds := float64(remaining) / rate
+	etaDuration := time.Duration(etaSeconds * float64(time.Second))
+
+	// Format duration nicely
+	if etaDuration < time.Minute {
+		return fmt.Sprintf("%ds", int(etaDuration.Seconds()))
+	} else if etaDuration < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(etaDuration.Minutes()), int(etaDuration.Seconds())%60)
+	} else {
+		return fmt.Sprintf("%dh%dm", int(etaDuration.Hours()), int(etaDuration.Minutes())%60)
+	}
+}
+
 // render displays the current progress
 func (pt *ProgressTracker) render() {
 	if pt.total == 0 {
@@ -122,13 +167,21 @@ func (pt *ProgressTracker) render() {
 	// Create the progress bar view
 	bar := pt.prog.ViewAs(percent)
 
-	// Build a simple status line
-	status := fmt.Sprintf("Progress: %s %3.0f%% [%d/%d dirs, %d git repos found]",
+	// Update ETA periodically to avoid flickering
+	now := time.Now()
+	if now.Sub(pt.lastETAUpdate) >= pt.etaUpdateInterval {
+		pt.cachedETA = pt.calculateETA()
+		pt.lastETAUpdate = now
+	}
+
+	// Build status line with ETA
+	status := fmt.Sprintf("Progress: %s %3.0f%% [%d/%d dirs, %d git repos found] ETA: %s",
 		bar,
 		percent*100,
 		pt.current,
 		pt.total,
 		pt.gitRepoCount,
+		pt.cachedETA,
 	)
 
 	// Simple overwrite - just print with carriage return
