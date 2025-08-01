@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -160,7 +161,7 @@ func TestPullSingle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
-			err := pullSingle(dir)
+			err := pullSingle(context.Background(), dir)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -221,11 +222,11 @@ func TestPullCmd_Integration(t *testing.T) {
 
 	t.Run("pull functions work correctly", func(t *testing.T) {
 		// Test pullSingle function directly
-		err := pullSingle(repo1)
+		err := pullSingle(context.Background(), repo1)
 		assert.NoError(t, err) // Should not error even if git command fails
 
 		// Test with non-git repo
-		err = pullSingle(nonRepo)
+		err = pullSingle(context.Background(), nonRepo)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a git repository")
 	})

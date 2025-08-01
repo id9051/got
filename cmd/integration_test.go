@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,12 +46,13 @@ func TestRecursiveOperations_Integration(t *testing.T) {
 
 	t.Run("walkDirectories processes all directories", func(t *testing.T) {
 		var processedPaths []string
-		testOperation := func(path string) error {
+		testOperation := func(ctx context.Context, path string) error {
 			processedPaths = append(processedPaths, path)
 			return nil
 		}
 
-		err := walkDirectories(rootPath, testOperation)
+		ctx := context.Background()
+		err := walkDirectories(ctx, rootPath, testOperation)
 		assert.NoError(t, err)
 
 		// Count expected git repositories that should not be skipped
@@ -111,33 +113,35 @@ func TestFullCommandExecution_Integration(t *testing.T) {
 	_, dirs := testutil.CreateTestDirStructure(t)
 
 	t.Run("single functions work correctly", func(t *testing.T) {
+		ctx := context.Background()
 		repo1Path := dirs["repo1"]
 		testutil.AssertIsGitRepo(t, repo1Path)
 
 		// Test single functions directly
-		err := pullSingle(repo1Path)
+		err := pullSingle(ctx, repo1Path)
 		assert.NoError(t, err) // Should not error even if git fails
 
-		err = fetchSingle(repo1Path)
+		err = fetchSingle(ctx, repo1Path)
 		assert.NoError(t, err) // Should not error even if git fails
 
-		err = statusSingle(repo1Path)
+		err = statusSingle(ctx, repo1Path)
 		assert.NoError(t, err) // Should not error even if git fails
 	})
 
 	t.Run("single functions fail with non-git repo", func(t *testing.T) {
+		ctx := context.Background()
 		nonRepoPath := dirs["nonrepo"]
 
 		// All single functions should fail with non-git directory
-		err := pullSingle(nonRepoPath)
+		err := pullSingle(ctx, nonRepoPath)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a git repository")
 
-		err = fetchSingle(nonRepoPath)
+		err = fetchSingle(ctx, nonRepoPath)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a git repository")
 
-		err = statusSingle(nonRepoPath)
+		err = statusSingle(ctx, nonRepoPath)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a git repository")
 	})
@@ -169,12 +173,13 @@ func TestRecursiveFlag_Integration(t *testing.T) {
 	t.Run("walk operations work", func(t *testing.T) {
 		// Test that walkDirectories function works correctly
 		var processedPaths []string
-		testOperation := func(path string) error {
+		testOperation := func(ctx context.Context, path string) error {
 			processedPaths = append(processedPaths, path)
 			return nil
 		}
 
-		err := walkDirectories(rootPath, testOperation)
+		ctx := context.Background()
+		err := walkDirectories(ctx, rootPath, testOperation)
 		assert.NoError(t, err)
 		assert.Greater(t, len(processedPaths), 0)
 		assert.Contains(t, processedPaths, rootPath)

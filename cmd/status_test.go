@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -153,7 +154,7 @@ func TestStatusSingle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
-			err := statusSingle(dir)
+			err := statusSingle(context.Background(), dir)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -209,7 +210,7 @@ func TestStatusCmd_OutputHandling(t *testing.T) {
 	require.NoError(t, os.Mkdir(gitDir, 0755))
 
 	// The status command should not error on execution path
-	err := statusSingle(tempDir)
+	err := statusSingle(context.Background(), tempDir)
 	assert.NoError(t, err) // Returns nil even if git command fails
 }
 
@@ -239,11 +240,11 @@ func TestStatusCmd_Integration(t *testing.T) {
 
 	t.Run("status functions work correctly", func(t *testing.T) {
 		// Test statusSingle function directly
-		err := statusSingle(repo1)
+		err := statusSingle(context.Background(), repo1)
 		assert.NoError(t, err) // Should not error even if git command fails
 
 		// Test with non-git repo
-		err = statusSingle(nonRepo)
+		err = statusSingle(context.Background(), nonRepo)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a git repository")
 	})

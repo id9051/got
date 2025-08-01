@@ -14,6 +14,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -51,11 +53,11 @@ got fetch -r /path/to/projects # Recursively fetch all repositories`,
 		}
 
 		if recursive {
-			return walkDirectories(args[0], func(path string) error {
-				return executeGitCommand(path, "fetch")
+			return walkDirectories(globalCtx, args[0], func(ctx context.Context, path string) error {
+				return executeGitCommand(ctx, path, "fetch")
 			})
 		}
-		return fetchSingle(args[0])
+		return fetchSingle(globalCtx, args[0])
 	},
 }
 
@@ -75,18 +77,22 @@ func init() {
 }
 
 // fetchSingle performs git fetch on a single directory
-func fetchSingle(path string) error {
+func fetchSingle(ctx context.Context, path string) error {
 	if shouldSkipPath(path) {
 		logSkipped(path)
 		return nil
 	}
-	return executeGitCommandSingle(path, "fetch")
+	return executeGitCommandSingle(ctx, path, "fetch")
 }
 
 // fetchWalk is deprecated - functionality moved to walkDirectories in utils.go
 // Kept for backward compatibility but now just calls the generic walker
 func fetchWalk(path string) error {
-	return walkDirectories(path, func(path string) error {
-		return executeGitCommand(path, "fetch")
+	ctx := globalCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return walkDirectories(ctx, path, func(ctx context.Context, path string) error {
+		return executeGitCommand(ctx, path, "fetch")
 	})
 }

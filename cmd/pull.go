@@ -15,6 +15,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -52,11 +54,11 @@ got pull -r /path/to/projects # Recursively pull all repositories`,
 		}
 
 		if recursive {
-			return walkDirectories(args[0], func(path string) error {
-				return executeGitCommand(path, "pull")
+			return walkDirectories(globalCtx, args[0], func(ctx context.Context, path string) error {
+				return executeGitCommand(ctx, path, "pull")
 			})
 		}
-		return pullSingle(args[0])
+		return pullSingle(globalCtx, args[0])
 	},
 }
 
@@ -77,18 +79,22 @@ func init() {
 }
 
 // pullSingle performs git pull on a single directory
-func pullSingle(path string) error {
+func pullSingle(ctx context.Context, path string) error {
 	if shouldSkipPath(path) {
 		logSkipped(path)
 		return nil
 	}
-	return executeGitCommandSingle(path, "pull")
+	return executeGitCommandSingle(ctx, path, "pull")
 }
 
 // pullWalk is deprecated - functionality moved to walkDirectories in utils.go
 // Kept for backward compatibility but now just calls the generic walker
 func pullWalk(path string) error {
-	return walkDirectories(path, func(path string) error {
-		return executeGitCommand(path, "pull")
+	ctx := globalCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return walkDirectories(ctx, path, func(ctx context.Context, path string) error {
+		return executeGitCommand(ctx, path, "pull")
 	})
 }

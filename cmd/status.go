@@ -15,6 +15,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -52,11 +54,11 @@ got status -r /path/to/projects # Recursively show status of all repositories`,
 		}
 
 		if recursive {
-			return walkDirectories(args[0], func(path string) error {
-				return executeGitCommand(path, "status")
+			return walkDirectories(globalCtx, args[0], func(ctx context.Context, path string) error {
+				return executeGitCommand(ctx, path, "status")
 			})
 		}
-		return statusSingle(args[0])
+		return statusSingle(globalCtx, args[0])
 	},
 }
 
@@ -76,18 +78,22 @@ func init() {
 }
 
 // statusSingle performs git status on a single directory
-func statusSingle(path string) error {
+func statusSingle(ctx context.Context, path string) error {
 	if shouldSkipPath(path) {
 		logSkipped(path)
 		return nil
 	}
-	return executeGitCommandSingle(path, "status")
+	return executeGitCommandSingle(ctx, path, "status")
 }
 
 // statusWalk is deprecated - functionality moved to walkDirectories in utils.go
 // Kept for backward compatibility but now just calls the generic walker
 func statusWalk(path string) error {
-	return walkDirectories(path, func(path string) error {
-		return executeGitCommand(path, "status")
+	ctx := globalCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return walkDirectories(ctx, path, func(ctx context.Context, path string) error {
+		return executeGitCommand(ctx, path, "status")
 	})
 }

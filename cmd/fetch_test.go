@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -154,7 +155,8 @@ func TestFetchSingle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
-			err := fetchSingle(dir)
+			ctx := context.Background()
+			err := fetchSingle(ctx, dir)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -224,12 +226,13 @@ func TestFetchCmd_Integration(t *testing.T) {
 	})
 
 	t.Run("fetch functions work correctly", func(t *testing.T) {
+		ctx := context.Background()
 		// Test fetchSingle function directly
-		err := fetchSingle(repo1)
+		err := fetchSingle(ctx, repo1)
 		assert.NoError(t, err) // Should not error even if git command fails
 
 		// Test with non-git repo
-		err = fetchSingle(nonRepo)
+		err = fetchSingle(ctx, nonRepo)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a git repository")
 	})

@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -109,29 +110,29 @@ type GitOutput struct {
 var gitOutputBuffer []GitOutput
 var inProgressMode bool
 
-// executeGitCommand executes a git command in the specified directory
+// executeGitCommand executes a git command in the specified directory with context
 // For recursive operations - silently skips non-git directories
-func executeGitCommand(path string, gitArgs ...string) error {
+func executeGitCommand(ctx context.Context, path string, gitArgs ...string) error {
 	// Skip non-git directories silently during recursive operations
 	if !isGitRepository(path) {
 		return nil
 	}
 
-	return runGitCommand(path, gitArgs...)
+	return runGitCommand(ctx, path, gitArgs...)
 }
 
-// executeGitCommandSingle executes a git command on a single directory
+// executeGitCommandSingle executes a git command on a single directory with context
 // For single directory operations - returns error if not a git repository
-func executeGitCommandSingle(path string, gitArgs ...string) error {
+func executeGitCommandSingle(ctx context.Context, path string, gitArgs ...string) error {
 	if !isGitRepository(path) {
 		return errors.Errorf("[%s] is not a git repository", path)
 	}
 
-	return runGitCommand(path, gitArgs...)
+	return runGitCommand(ctx, path, gitArgs...)
 }
 
-// runGitCommand is the shared implementation for running git commands
-func runGitCommand(path string, gitArgs ...string) error {
+// runGitCommand is the shared implementation for running git commands with context
+func runGitCommand(ctx context.Context, path string, gitArgs ...string) error {
 	// Build git command with explicit work-tree and git-dir
 	args := []string{
 		fmt.Sprintf("--work-tree=%s", path),
@@ -139,7 +140,7 @@ func runGitCommand(path string, gitArgs ...string) error {
 	}
 	args = append(args, gitArgs...)
 
-	gitCmd := exec.Command("git", args...)
+	gitCmd := exec.CommandContext(ctx, "git", args...)
 
 	// For status command, we want to show output to user but need to handle progress bar
 	var output []byte
@@ -171,6 +172,9 @@ func runGitCommand(path string, gitArgs ...string) error {
 					case <-done:
 						fmt.Print("\r\033[K") // Clear line
 						return
+					case <-ctx.Done():
+						fmt.Print("\r\033[K") // Clear line
+						return
 					case <-ticker.C:
 						fmt.Printf("\r%s %s %s",
 							spinner.Next(),
@@ -191,6 +195,11 @@ func runGitCommand(path string, gitArgs ...string) error {
 		}
 	}
 	// For status commands, output was already captured above
+
+	// Check for context cancellation
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 
 	if err != nil {
 		logError(path, err)
@@ -225,7 +234,7 @@ func runGitCommand(path string, gitArgs ...string) error {
 }
 
 // walkDirectories is a generic function for walking directories and applying git operations
-func walkDirectories(rootPath string, gitOperation func(string) error) error {
+func walkDirectories(ctx context.Context, rootPath string, gitOperation func(context.Context, string) error) error {
 	// Enable progress mode and clear output buffer
 	inProgressMode = true
 	gitOutputBuffer = []GitOutput{}
@@ -274,6 +283,13 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 	gitRepoCount := 0
 
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		// Check for context cancellation first
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		// Handle walking errors (e.g., deleted directories during walk)
 		if err != nil {
 			fmt.Println(styleError(path, errors.Wrapf(err, "error walking filepath")))
@@ -307,14 +323,19 @@ func walkDirectories(rootPath string, gitOperation func(string) error) error {
 		// Check if this is a git repository before applying operation
 		if isGit {
 			gitRepoCount++
-			// Apply git operation
-			gitOperation(path)
+			// Apply git operation with context
+			if err := gitOperation(ctx, path); err != nil && err == context.Canceled {
+				return err // Propagate cancellation
+			}
 			// Skip subdirectories of git repositories since we only operate on repo roots
 			return filepath.SkipDir
 		}
 
 		// Apply git operation to non-git directories (will be skipped silently)
-		return gitOperation(path)
+		if err := gitOperation(ctx, path); err != nil && err == context.Canceled {
+			return err // Propagate cancellation
+		}
+		return nil
 	})
 
 	// Finish progress display

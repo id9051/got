@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -229,7 +230,7 @@ func TestExecuteGitCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
-			err := executeGitCommand(dir, tt.gitArgs...)
+			err := executeGitCommand(context.Background(), dir, tt.gitArgs...)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -272,7 +273,7 @@ func TestExecuteGitCommandSingle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
-			err := executeGitCommandSingle(dir, tt.gitArgs...)
+			err := executeGitCommandSingle(context.Background(), dir, tt.gitArgs...)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -304,12 +305,12 @@ func TestWalkDirectories(t *testing.T) {
 
 	// Track which directories the operation was called on
 	var calledPaths []string
-	testOperation := func(path string) error {
+	testOperation := func(ctx context.Context, path string) error {
 		calledPaths = append(calledPaths, path)
 		return nil
 	}
 
-	err := walkDirectories(tempDir, testOperation)
+	err := walkDirectories(context.Background(), tempDir, testOperation)
 	assert.NoError(t, err)
 
 	// Should have been called on the root and all subdirectories
