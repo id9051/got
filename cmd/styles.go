@@ -16,14 +16,14 @@ package cmd
 
 import (
 	"fmt"
-	
+
 	"github.com/charmbracelet/lipgloss"
 )
 
 // Color palette for consistent theming - optimized for dark backgrounds
 var (
 	primaryColor   = lipgloss.Color("#00D787") // Brighter green for dark backgrounds
-	secondaryColor = lipgloss.Color("#5FAFFF") // Brighter blue  
+	secondaryColor = lipgloss.Color("#5FAFFF") // Brighter blue
 	successColor   = lipgloss.Color("#00FF87") // Bright success green
 	warningColor   = lipgloss.Color("#FFAF00") // Bright warning orange
 	errorColor     = lipgloss.Color("#FF5F5F") // Bright error red
@@ -35,79 +35,79 @@ var (
 var (
 	// Success style with checkmark
 	successStyle = lipgloss.NewStyle().
-		Foreground(successColor).
-		Bold(true)
+			Foreground(successColor).
+			Bold(true)
 
 	// Error style with X mark
 	errorStyle = lipgloss.NewStyle().
-		Foreground(errorColor).
-		Bold(true)
+			Foreground(errorColor).
+			Bold(true)
 
 	// Warning/skip style with warning icon
 	warningStyle = lipgloss.NewStyle().
-		Foreground(warningColor).
-		Bold(true)
+			Foreground(warningColor).
+			Bold(true)
 
 	// Info style for general information
 	infoStyle = lipgloss.NewStyle().
-		Foreground(secondaryColor)
+			Foreground(secondaryColor)
 
 	// Muted style for less important info
 	mutedStyle = lipgloss.NewStyle().
-		Foreground(mutedColor)
+			Foreground(mutedColor)
 
 	// Path style for highlighting file paths
 	pathStyle = lipgloss.NewStyle().
-		Foreground(primaryColor).
-		Bold(true)
+			Foreground(primaryColor).
+			Bold(true)
 
 	// Count/number style
 	numberStyle = lipgloss.NewStyle().
-		Foreground(accentColor).
-		Bold(true)
+			Foreground(accentColor).
+			Bold(true)
 
 	// Progress style
 	progressStyle = lipgloss.NewStyle().
-		Foreground(secondaryColor).
-		Italic(true)
+			Foreground(secondaryColor).
+			Italic(true)
 
 	// Header style for section headers
 	headerStyle = lipgloss.NewStyle().
-		Foreground(primaryColor).
-		Bold(true).
-		Underline(true)
+			Foreground(primaryColor).
+			Bold(true).
+			Underline(true)
 
 	// Box style for important messages
 	boxStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(primaryColor).
-		Padding(0, 1).
-		MarginTop(1).
-		MarginBottom(1)
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(primaryColor).
+			Padding(0, 1).
+			MarginTop(1).
+			MarginBottom(1)
 
 	// Summary box style
 	summaryStyle = lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
-		BorderForeground(successColor).
-		Padding(0, 2).
-		MarginTop(1).
-		MarginBottom(1).
-		Bold(true)
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(successColor).
+			Padding(0, 2).
+			MarginTop(1).
+			MarginBottom(1).
+			Bold(true)
 )
 
 // Icons for different message types
 const (
-	checkIcon    = "✓"
-	crossIcon    = "✗"
-	warningIcon  = "⚠"
-	infoIcon     = "ℹ"
-	arrowIcon    = "→"
-	dotIcon      = "•"
-	searchIcon   = "🔍"
-	gitIcon      = "📁"
-	skipIcon     = "⏭"
-	summaryIcon  = "📊"
-	rocketIcon   = "🚀"
+	checkIcon   = "✓"
+	crossIcon   = "✗"
+	warningIcon = "⚠"
+	infoIcon    = "ℹ"
+	arrowIcon   = "→"
+	dotIcon     = "•"
+	searchIcon  = "🔍"
+	gitIcon     = "📁"
+	skipIcon    = "⏭"
+	summaryIcon = "📊"
+	rocketIcon  = "🚀"
 )
 
 // Styled message functions
@@ -124,19 +124,19 @@ func styleSkipped(path string) string {
 }
 
 func styleProgress(message string) string {
-	return progressStyle.Render(searchIcon+" "+message)
+	return progressStyle.Render(searchIcon + " " + message)
 }
 
 func styleSummary(message string) string {
-	return summaryStyle.Render(summaryIcon+" "+message)
+	return summaryStyle.Render(summaryIcon + " " + message)
 }
 
 func styleInfo(message string) string {
-	return infoStyle.Render(infoIcon+" "+message)
+	return infoStyle.Render(infoIcon + " " + message)
 }
 
 func styleHeader(message string) string {
-	return headerStyle.Render(rocketIcon+" "+message)
+	return headerStyle.Render(rocketIcon + " " + message)
 }
 
 func stylePath(path string) string {
@@ -147,9 +147,9 @@ func styleNumber(num int) string {
 	return numberStyle.Render(fmt.Sprintf("%d", num))
 }
 
-// Helper function to style git command descriptions  
+// Helper function to style git command descriptions
 func styleGitCommand(command string) string {
-	return infoStyle.Render(gitIcon+" git "+command)
+	return infoStyle.Render(gitIcon + " git " + command)
 }
 
 // Box wrapper for important messages
@@ -160,13 +160,13 @@ func styleBox(content string) string {
 // Enhanced command descriptions with styling
 func getStyledDescription(baseDesc string, examples []string) string {
 	styled := baseDesc + "\n\n"
-	
+
 	if len(examples) > 0 {
 		styled += headerStyle.Render("Examples:") + "\n"
 		for _, example := range examples {
 			styled += mutedStyle.Render("  "+dotIcon+" ") + pathStyle.Render(example) + "\n"
 		}
 	}
-	
+
 	return styled
 }

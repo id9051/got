@@ -44,7 +44,7 @@ func TestGetSkipList(t *testing.T) {
 			setup: func() {
 				viper.Reset()
 			},
-			expected: []string{},
+			expected: []string{"node_modules", "vendor", ".git"},
 		},
 		{
 			name: "configured skip list",
@@ -52,15 +52,15 @@ func TestGetSkipList(t *testing.T) {
 				viper.Reset()
 				viper.Set("skipList", []string{"node_modules", ".git", "vendor"})
 			},
-			expected: []string{"node_modules", ".git", "vendor"},
+			expected: []string{"node_modules", "vendor", ".git"},
 		},
 		{
 			name: "skip list with empty strings",
 			setup: func() {
 				viper.Reset()
-				viper.Set("skipList", []string{"node_modules", "", "  ", "vendor"})
+				viper.Set("skipList", []string{"test1", "", "  ", "test2"})
 			},
-			expected: []string{"node_modules", "vendor"},
+			expected: []string{"node_modules", "vendor", ".git", "test1", "test2"},
 		},
 		{
 			name: "skip list with only whitespace",
@@ -68,7 +68,7 @@ func TestGetSkipList(t *testing.T) {
 				viper.Reset()
 				viper.Set("skipList", []string{"", "  ", "\t", "\n"})
 			},
-			expected: []string{},
+			expected: []string{"node_modules", "vendor", ".git"},
 		},
 	}
 
@@ -76,7 +76,7 @@ func TestGetSkipList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
 			result := getSkipList()
-			assert.Equal(t, tt.expected, result)
+			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
@@ -121,39 +121,43 @@ func TestInitConfig(t *testing.T) {
 	t.Run("config initialization", func(t *testing.T) {
 		// Reset viper to test initialization
 		viper.Reset()
-		
+
 		// Test that initConfig doesn't panic
 		assert.NotPanics(t, func() {
 			initConfig()
 		})
-		
+
 		// After init, viper should be configured
 		// Note: AutomaticEnv is a function call, not a boolean property
 		assert.NotPanics(t, func() { viper.AutomaticEnv() })
 	})
 
 	t.Run("config file loading", func(t *testing.T) {
-		// Create a temporary config file
-		tempDir := t.TempDir()
-		configFile := filepath.Join(tempDir, ".got.yaml")
+		// Save original HOME
+		originalHome := os.Getenv("HOME")
+
+		// Create a temporary directory to act as HOME
+		tempHome := t.TempDir()
+		os.Setenv("HOME", tempHome)
+		defer os.Setenv("HOME", originalHome)
+
+		// Create a config file in the temp HOME
+		configFile := filepath.Join(tempHome, ".got.yaml")
 		configContent := `skipList:
-  - node_modules
-  - .git
-  - vendor
+  - test1
+  - test2
+  - test3
 `
 		require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
 
-		// Set the config file path
+		// Reset viper and initialize config
 		viper.Reset()
-		cfgFile = configFile
-		defer func() { cfgFile = "" }()
-
-		// Initialize config
+		cfgFile = ""
 		initConfig()
 
-		// Verify config was loaded
+		// Verify config was loaded from our test file
 		skipList := viper.GetStringSlice("skipList")
-		expected := []string{"node_modules", ".git", "vendor"}
+		expected := []string{"test1", "test2", "test3"}
 		assert.Equal(t, expected, skipList)
 	})
 }
@@ -162,13 +166,13 @@ func TestExecute(t *testing.T) {
 	// Test that Execute function exists and can be called
 	// Note: We can't easily test the actual execution without mocking os.Exit
 	assert.NotNil(t, Execute)
-	
+
 	// Test that the function is callable (this is a basic smoke test)
 	// In a real scenario, we'd mock os.Exit and test different scenarios
 	t.Run("function exists", func(t *testing.T) {
 		// Just verify the function exists and is callable
 		// We can't actually call it in tests without mocking os.Exit
-		assert.IsType(t, func(){}, Execute)
+		assert.IsType(t, func() {}, Execute)
 	})
 }
 
@@ -193,13 +197,13 @@ func TestViperIntegration(t *testing.T) {
 
 	t.Run("environment variable integration", func(t *testing.T) {
 		viper.Reset()
-		
+
 		// Set an environment variable that should be picked up
 		os.Setenv("SKIPLIST", "test1,test2")
 		defer os.Unsetenv("SKIPLIST")
-		
+
 		initConfig()
-		
+
 		// Verify that AutomaticEnv is working
 		// Note: The actual env var mapping would need to be configured
 		// This is more of a structural test
@@ -208,18 +212,18 @@ func TestViperIntegration(t *testing.T) {
 
 	t.Run("config file precedence", func(t *testing.T) {
 		viper.Reset()
-		
+
 		// Test that explicit config file setting works
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, "custom.yaml")
 		configContent := `skipList: ["custom1", "custom2"]`
 		require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
-		
+
 		cfgFile = configFile
 		defer func() { cfgFile = "" }()
-		
+
 		initConfig()
-		
+
 		// The config should be loaded (even if the exact values depend on file format)
 		assert.NotNil(t, viper.ConfigFileUsed())
 	})

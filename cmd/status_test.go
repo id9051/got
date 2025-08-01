@@ -75,7 +75,7 @@ func TestStatusCmd_ArgumentValidation(t *testing.T) {
 			}
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -96,29 +96,29 @@ func TestStatusCmd_ArgumentValidation(t *testing.T) {
 func TestStatusCmd_FlagHandling(t *testing.T) {
 	t.Run("recursive flag", func(t *testing.T) {
 		tempDir := t.TempDir()
-		
+
 		statusCmd.SetArgs([]string{"--recursive", tempDir})
 		err := statusCmd.ParseFlags([]string{"--recursive", tempDir})
 		assert.NoError(t, err)
-		
+
 		recursive, err := statusCmd.Flags().GetBool("recursive")
 		assert.NoError(t, err)
 		assert.True(t, recursive)
-		
+
 		statusCmd.SetArgs(nil)
 	})
 
 	t.Run("short recursive flag", func(t *testing.T) {
 		tempDir := t.TempDir()
-		
+
 		statusCmd.SetArgs([]string{"-r", tempDir})
 		err := statusCmd.ParseFlags([]string{"-r", tempDir})
 		assert.NoError(t, err)
-		
+
 		recursive, err := statusCmd.Flags().GetBool("recursive")
 		assert.NoError(t, err)
 		assert.True(t, recursive)
-		
+
 		statusCmd.SetArgs(nil)
 	})
 }
@@ -154,7 +154,7 @@ func TestStatusSingle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
 			err := statusSingle(dir)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -170,11 +170,11 @@ func TestStatusSingle(t *testing.T) {
 func TestStatusWalk(t *testing.T) {
 	// Test the deprecated statusWalk function
 	tempDir := t.TempDir()
-	
+
 	// Create a git repository
 	gitDir := filepath.Join(tempDir, GitDirName)
 	require.NoError(t, os.Mkdir(gitDir, 0755))
-	
+
 	// statusWalk should not return an error (it returns nil even on git failures)
 	err := statusWalk(tempDir)
 	assert.NoError(t, err)
@@ -191,7 +191,7 @@ func TestStatusCmd_Examples(t *testing.T) {
 func TestStatusCmd_UniqueFeatures(t *testing.T) {
 	// Test status-specific features
 	assert.Contains(t, statusCmd.Long, "working tree status")
-	
+
 	// Ensure it's different from other commands
 	assert.NotEqual(t, statusCmd.Short, pullCmd.Short)
 	assert.NotEqual(t, statusCmd.Short, fetchCmd.Short)
@@ -202,12 +202,12 @@ func TestStatusCmd_OutputHandling(t *testing.T) {
 	// Status command should show output to user (unlike pull/fetch)
 	// This is tested indirectly through the runGitCommand function
 	// which has special handling for status commands
-	
+
 	// We can verify that the status command uses the same git execution path
 	tempDir := t.TempDir()
 	gitDir := filepath.Join(tempDir, GitDirName)
 	require.NoError(t, os.Mkdir(gitDir, 0755))
-	
+
 	// The status command should not error on execution path
 	err := statusSingle(tempDir)
 	assert.NoError(t, err) // Returns nil even if git command fails
@@ -216,32 +216,32 @@ func TestStatusCmd_OutputHandling(t *testing.T) {
 func TestStatusCmd_Integration(t *testing.T) {
 	// Create a complex directory structure for integration testing
 	tempDir := t.TempDir()
-	
+
 	// Create multiple subdirectories, some with git repos
 	repo1 := filepath.Join(tempDir, "repo1")
 	repo2 := filepath.Join(tempDir, "repo2")
 	nonRepo := filepath.Join(tempDir, "nonrepo")
-	
+
 	require.NoError(t, os.MkdirAll(repo1, 0755))
 	require.NoError(t, os.MkdirAll(repo2, 0755))
 	require.NoError(t, os.MkdirAll(nonRepo, 0755))
-	
+
 	// Make repo1 and repo2 git repositories
 	require.NoError(t, os.Mkdir(filepath.Join(repo1, GitDirName), 0755))
 	require.NoError(t, os.Mkdir(filepath.Join(repo2, GitDirName), 0755))
-	
+
 	t.Run("git repository detection", func(t *testing.T) {
 		// Test git repository detection directly
 		assert.True(t, isGitRepository(repo1))
 		assert.True(t, isGitRepository(repo2))
 		assert.False(t, isGitRepository(nonRepo))
 	})
-	
+
 	t.Run("status functions work correctly", func(t *testing.T) {
 		// Test statusSingle function directly
 		err := statusSingle(repo1)
 		assert.NoError(t, err) // Should not error even if git command fails
-		
+
 		// Test with non-git repo
 		err = statusSingle(nonRepo)
 		assert.Error(t, err)

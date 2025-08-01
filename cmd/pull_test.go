@@ -75,7 +75,7 @@ func TestPullCmd_ArgumentValidation(t *testing.T) {
 			}
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -97,35 +97,35 @@ func TestPullCmd_ArgumentValidation(t *testing.T) {
 func TestPullCmd_FlagHandling(t *testing.T) {
 	t.Run("recursive flag", func(t *testing.T) {
 		tempDir := t.TempDir()
-		
+
 		// Test recursive flag parsing
 		pullCmd.SetArgs([]string{"-r", tempDir})
-		
+
 		// We can't easily test the full execution, but we can test that
 		// the command accepts the flag without argument validation errors
 		err := pullCmd.ParseFlags([]string{"-r", tempDir})
 		assert.NoError(t, err)
-		
+
 		// Check that the flag was parsed correctly
 		recursive, err := pullCmd.Flags().GetBool("recursive")
 		assert.NoError(t, err)
 		assert.True(t, recursive)
-		
+
 		// Reset for next test
 		pullCmd.SetArgs(nil)
 	})
 
 	t.Run("short recursive flag", func(t *testing.T) {
 		tempDir := t.TempDir()
-		
+
 		pullCmd.SetArgs([]string{"-r", tempDir})
 		err := pullCmd.ParseFlags([]string{"-r", tempDir})
 		assert.NoError(t, err)
-		
+
 		recursive, err := pullCmd.Flags().GetBool("recursive")
 		assert.NoError(t, err)
 		assert.True(t, recursive)
-		
+
 		pullCmd.SetArgs(nil)
 	})
 }
@@ -161,7 +161,7 @@ func TestPullSingle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
 			err := pullSingle(dir)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -177,11 +177,11 @@ func TestPullSingle(t *testing.T) {
 func TestPullWalk(t *testing.T) {
 	// Test the deprecated pullWalk function
 	tempDir := t.TempDir()
-	
+
 	// Create a git repository
 	gitDir := filepath.Join(tempDir, GitDirName)
 	require.NoError(t, os.Mkdir(gitDir, 0755))
-	
+
 	// pullWalk should not return an error (it returns nil even on git failures)
 	err := pullWalk(tempDir)
 	assert.NoError(t, err)
@@ -198,32 +198,32 @@ func TestPullCmd_Examples(t *testing.T) {
 func TestPullCmd_Integration(t *testing.T) {
 	// Create a complex directory structure for integration testing
 	tempDir := t.TempDir()
-	
+
 	// Create multiple subdirectories, some with git repos
 	repo1 := filepath.Join(tempDir, "repo1")
 	repo2 := filepath.Join(tempDir, "repo2")
 	nonRepo := filepath.Join(tempDir, "nonrepo")
-	
+
 	require.NoError(t, os.MkdirAll(repo1, 0755))
 	require.NoError(t, os.MkdirAll(repo2, 0755))
 	require.NoError(t, os.MkdirAll(nonRepo, 0755))
-	
+
 	// Make repo1 and repo2 git repositories
 	require.NoError(t, os.Mkdir(filepath.Join(repo1, GitDirName), 0755))
 	require.NoError(t, os.Mkdir(filepath.Join(repo2, GitDirName), 0755))
-	
+
 	t.Run("git repository detection", func(t *testing.T) {
 		// Test git repository detection directly
 		assert.True(t, isGitRepository(repo1))
 		assert.True(t, isGitRepository(repo2))
 		assert.False(t, isGitRepository(nonRepo))
 	})
-	
+
 	t.Run("pull functions work correctly", func(t *testing.T) {
 		// Test pullSingle function directly
 		err := pullSingle(repo1)
 		assert.NoError(t, err) // Should not error even if git command fails
-		
+
 		// Test with non-git repo
 		err = pullSingle(nonRepo)
 		assert.Error(t, err)

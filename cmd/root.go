@@ -28,30 +28,30 @@ var cfgFile string
 // getSkipList returns the skip list from configuration, with defaults if not configured
 func getSkipList() []string {
 	skipList := viper.GetStringSlice("skipList")
-	
+
 	// Check if user wants to disable default skips (defaults to true)
 	useDefaults := true
 	if viper.IsSet("useDefaultSkips") {
 		useDefaults = viper.GetBool("useDefaultSkips")
 	}
-	
+
 	// Default directories that are commonly skipped
 	defaultSkips := []string{"node_modules", "vendor", ".git"}
-	
+
 	// Merge with configured skip list
 	skipMap := make(map[string]bool)
-	
+
 	// Only add defaults if enabled
 	if useDefaults {
 		for _, skip := range defaultSkips {
 			skipMap[skip] = true
 		}
 	}
-	
+
 	for _, skip := range skipList {
 		skipMap[skip] = true
 	}
-	
+
 	// Convert map back to slice
 	validSkipList := make([]string, 0, len(skipMap))
 	for skip := range skipMap {
@@ -61,7 +61,7 @@ func getSkipList() []string {
 			validSkipList = append(validSkipList, skip)
 		}
 	}
-	
+
 	return validSkipList
 }
 

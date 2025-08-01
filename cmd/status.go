@@ -27,7 +27,12 @@ var statusCmd = &cobra.Command{
 
 If the --recursive flag is used, got will walk through all subdirectories
 and show status of any Git repositories found. Directories specified
-in the skip list configuration will be ignored during recursive operations.`,
+in the skip list configuration will be ignored during recursive operations.
+
+Examples:
+  got status .                    # Show status in current directory
+  got status /path/to/repo        # Show status in specific directory
+  got status -r /path/to/projects # Recursively show status of all repositories`,
 	Example: `got status .                    # Show status in current directory
 got status /path/to/repo        # Show status in specific directory
 got status -r /path/to/projects # Recursively show status of all repositories`,
@@ -35,17 +40,17 @@ got status -r /path/to/projects # Recursively show status of all repositories`,
 		if len(args) < 1 {
 			return errors.New("directory argument is required")
 		}
-		
+
 		// Validate directory path
 		if err := validateDirectoryPath(args[0]); err != nil {
 			return err
 		}
-		
+
 		recursive, err := cmd.Flags().GetBool(RecursiveFlagName)
 		if err != nil {
 			return errors.Wrap(err, "failed to get recursive flag")
 		}
-		
+
 		if recursive {
 			return walkDirectories(args[0], func(path string) error {
 				return executeGitCommand(path, "status")

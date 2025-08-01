@@ -76,7 +76,7 @@ func TestFetchCmd_ArgumentValidation(t *testing.T) {
 			}
 			cmd.SetArgs(tt.args)
 			err := cmd.Execute()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -97,29 +97,29 @@ func TestFetchCmd_ArgumentValidation(t *testing.T) {
 func TestFetchCmd_FlagHandling(t *testing.T) {
 	t.Run("recursive flag", func(t *testing.T) {
 		tempDir := t.TempDir()
-		
+
 		fetchCmd.SetArgs([]string{"--recursive", tempDir})
 		err := fetchCmd.ParseFlags([]string{"--recursive", tempDir})
 		assert.NoError(t, err)
-		
+
 		recursive, err := fetchCmd.Flags().GetBool("recursive")
 		assert.NoError(t, err)
 		assert.True(t, recursive)
-		
+
 		fetchCmd.SetArgs(nil)
 	})
 
 	t.Run("short recursive flag", func(t *testing.T) {
 		tempDir := t.TempDir()
-		
+
 		fetchCmd.SetArgs([]string{"-r", tempDir})
 		err := fetchCmd.ParseFlags([]string{"-r", tempDir})
 		assert.NoError(t, err)
-		
+
 		recursive, err := fetchCmd.Flags().GetBool("recursive")
 		assert.NoError(t, err)
 		assert.True(t, recursive)
-		
+
 		fetchCmd.SetArgs(nil)
 	})
 }
@@ -155,7 +155,7 @@ func TestFetchSingle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupDir(t)
 			err := fetchSingle(dir)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -171,11 +171,11 @@ func TestFetchSingle(t *testing.T) {
 func TestFetchWalk(t *testing.T) {
 	// Test the deprecated fetchWalk function
 	tempDir := t.TempDir()
-	
+
 	// Create a git repository
 	gitDir := filepath.Join(tempDir, GitDirName)
 	require.NoError(t, os.Mkdir(gitDir, 0755))
-	
+
 	// fetchWalk should not return an error (it returns nil even on git failures)
 	err := fetchWalk(tempDir)
 	assert.NoError(t, err)
@@ -192,7 +192,7 @@ func TestFetchCmd_Examples(t *testing.T) {
 func TestFetchCmd_DifferenceFromPull(t *testing.T) {
 	// Test that fetch command emphasizes it doesn't merge
 	assert.Contains(t, fetchCmd.Long, "without merging")
-	
+
 	// Ensure it's different from pull command
 	assert.NotEqual(t, fetchCmd.Short, pullCmd.Short)
 	assert.Contains(t, fetchCmd.Short, "Fetch")
@@ -202,32 +202,32 @@ func TestFetchCmd_DifferenceFromPull(t *testing.T) {
 func TestFetchCmd_Integration(t *testing.T) {
 	// Create a complex directory structure for integration testing
 	tempDir := t.TempDir()
-	
+
 	// Create multiple subdirectories, some with git repos
 	repo1 := filepath.Join(tempDir, "repo1")
 	repo2 := filepath.Join(tempDir, "repo2")
 	nonRepo := filepath.Join(tempDir, "nonrepo")
-	
+
 	require.NoError(t, os.MkdirAll(repo1, 0755))
 	require.NoError(t, os.MkdirAll(repo2, 0755))
 	require.NoError(t, os.MkdirAll(nonRepo, 0755))
-	
+
 	// Make repo1 and repo2 git repositories
 	require.NoError(t, os.Mkdir(filepath.Join(repo1, GitDirName), 0755))
 	require.NoError(t, os.Mkdir(filepath.Join(repo2, GitDirName), 0755))
-	
+
 	t.Run("git repository detection", func(t *testing.T) {
 		// Test git repository detection directly
 		assert.True(t, isGitRepository(repo1))
 		assert.True(t, isGitRepository(repo2))
 		assert.False(t, isGitRepository(nonRepo))
 	})
-	
+
 	t.Run("fetch functions work correctly", func(t *testing.T) {
 		// Test fetchSingle function directly
 		err := fetchSingle(repo1)
 		assert.NoError(t, err) // Should not error even if git command fails
-		
+
 		// Test with non-git repo
 		err = fetchSingle(nonRepo)
 		assert.Error(t, err)

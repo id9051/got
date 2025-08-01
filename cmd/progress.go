@@ -26,15 +26,15 @@ import (
 
 // ProgressTracker manages progress display for operations
 type ProgressTracker struct {
-	mu              sync.Mutex
-	total           int
-	current         int
-	currentPath     string
-	gitRepoCount    int
-	prog            progress.Model
-	lastUpdate      time.Time
-	updateInterval  time.Duration
-	showProgress    bool
+	mu             sync.Mutex
+	total          int
+	current        int
+	currentPath    string
+	gitRepoCount   int
+	prog           progress.Model
+	lastUpdate     time.Time
+	updateInterval time.Duration
+	showProgress   bool
 }
 
 // NewProgressTracker creates a new progress tracker
@@ -42,14 +42,14 @@ func NewProgressTracker() *ProgressTracker {
 	// Create a styled progress bar
 	prog := progress.New(progress.WithDefaultGradient())
 	prog.ShowPercentage = false // We'll show our own percentage
-	prog.Width = 50 // Make it wider
-	
+	prog.Width = 50             // Make it wider
+
 	// Style the progress bar with our colors - optimized for dark backgrounds
 	prog.Full = '█'
 	prog.Empty = '░'
 	prog.FullColor = string(primaryColor)
 	prog.EmptyColor = "#444444" // Darker gray for empty sections to contrast with text
-	
+
 	return &ProgressTracker{
 		prog:           prog,
 		updateInterval: 50 * time.Millisecond, // Faster updates for better visibility
@@ -80,13 +80,13 @@ func (pt *ProgressTracker) Start() {
 func (pt *ProgressTracker) Update(path string, isGitRepo bool) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	pt.current++
 	pt.currentPath = path
 	if isGitRepo {
 		pt.gitRepoCount++
 	}
-	
+
 	// Only update display if enough time has passed
 	if time.Since(pt.lastUpdate) >= pt.updateInterval {
 		pt.lastUpdate = time.Now()
@@ -100,10 +100,10 @@ func (pt *ProgressTracker) Update(path string, isGitRepo bool) {
 func (pt *ProgressTracker) Finish() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	if pt.showProgress {
 		// Clear the progress line and show cursor
-		fmt.Print("\r\033[K") // Clear current line
+		fmt.Print("\r\033[K")  // Clear current line
 		fmt.Print("\033[?25h") // Show cursor again
 	}
 }
@@ -113,24 +113,24 @@ func (pt *ProgressTracker) render() {
 	if pt.total == 0 {
 		return
 	}
-	
+
 	percent := float64(pt.current) / float64(pt.total)
 	if percent > 1.0 {
 		percent = 1.0
 	}
-	
+
 	// Create the progress bar view
 	bar := pt.prog.ViewAs(percent)
-	
+
 	// Build a simple status line
 	status := fmt.Sprintf("Progress: %s %3.0f%% [%d/%d dirs, %d git repos found]",
 		bar,
 		percent*100,
-		pt.current, 
-		pt.total, 
+		pt.current,
+		pt.total,
 		pt.gitRepoCount,
 	)
-	
+
 	// Simple overwrite - just print with carriage return
 	fmt.Printf("\r%s", infoStyle.Render(status))
 }
@@ -153,7 +153,7 @@ func (pt *ProgressTracker) GetProcessedCount() int {
 func (pt *ProgressTracker) ShowMessage(message string) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	if pt.showProgress {
 		// Clear current line and show message
 		fmt.Print("\r\033[K" + message + "\n")
@@ -170,21 +170,21 @@ func SimpleProgressBar(current, total int, width int) string {
 	if total == 0 {
 		return ""
 	}
-	
+
 	percent := float64(current) / float64(total)
 	if percent > 1.0 {
 		percent = 1.0
 	}
-	
+
 	filled := int(percent * float64(width))
 	empty := width - filled
-	
+
 	filledPart := strings.Repeat("█", filled)
 	emptyPart := strings.Repeat("░", empty)
-	
+
 	// Create a style with primary color
 	barStyle := lipgloss.NewStyle().Foreground(primaryColor)
-	
+
 	return fmt.Sprintf("%s%s %s %s",
 		barStyle.Render(filledPart),
 		mutedStyle.Render(emptyPart),
@@ -198,9 +198,9 @@ var SpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 
 // Spinner manages a simple spinner animation
 type Spinner struct {
-	frames []string
+	frames  []string
 	current int
-	mu     sync.Mutex
+	mu      sync.Mutex
 }
 
 // NewSpinner creates a new spinner
@@ -214,7 +214,7 @@ func NewSpinner() *Spinner {
 func (s *Spinner) Next() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	frame := s.frames[s.current]
 	s.current = (s.current + 1) % len(s.frames)
 	spinnerStyle := lipgloss.NewStyle().Foreground(primaryColor)

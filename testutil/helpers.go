@@ -27,11 +27,11 @@ import (
 // Returns the path to the temporary directory
 func CreateTempGitRepo(t *testing.T) string {
 	t.Helper()
-	
+
 	tempDir := t.TempDir()
 	gitDir := filepath.Join(tempDir, ".git")
 	require.NoError(t, os.Mkdir(gitDir, 0755))
-	
+
 	return tempDir
 }
 
@@ -46,10 +46,10 @@ func CreateTempNonGitDir(t *testing.T) string {
 // Returns the root path and a map of created directories
 func CreateTestDirStructure(t *testing.T) (rootPath string, dirs map[string]string) {
 	t.Helper()
-	
+
 	rootPath = t.TempDir()
 	dirs = make(map[string]string)
-	
+
 	// Create various directory types
 	structures := []struct {
 		name   string
@@ -66,18 +66,18 @@ func CreateTestDirStructure(t *testing.T) (rootPath string, dirs map[string]stri
 		{"deep/nested", false, ""},
 		{"deep/nested/repo4", true, ""},
 	}
-	
+
 	for _, s := range structures {
 		dirPath := filepath.Join(rootPath, s.name)
 		require.NoError(t, os.MkdirAll(dirPath, 0755))
 		dirs[s.name] = dirPath
-		
+
 		if s.hasGit {
 			gitDir := filepath.Join(dirPath, ".git")
 			require.NoError(t, os.Mkdir(gitDir, 0755))
 		}
 	}
-	
+
 	return rootPath, dirs
 }
 
@@ -85,23 +85,23 @@ func CreateTestDirStructure(t *testing.T) (rootPath string, dirs map[string]stri
 // Returns the path to the configuration file
 func CreateConfigFile(t *testing.T, content string) string {
 	t.Helper()
-	
+
 	tempDir := t.TempDir()
 	configFile := filepath.Join(tempDir, ".got.yaml")
 	require.NoError(t, os.WriteFile(configFile, []byte(content), 0644))
-	
+
 	return configFile
 }
 
 // CreateSkipListConfig creates a configuration file with a skip list
 func CreateSkipListConfig(t *testing.T, skipList []string) string {
 	t.Helper()
-	
+
 	content := "skipList:\n"
 	for _, item := range skipList {
 		content += "  - " + item + "\n"
 	}
-	
+
 	return CreateConfigFile(t, content)
 }
 
@@ -115,9 +115,9 @@ type GitRepoInfo struct {
 // CreateAdvancedTestStructure creates a more complex test structure with various scenarios
 func CreateAdvancedTestStructure(t *testing.T) (rootPath string, repos []GitRepoInfo) {
 	t.Helper()
-	
+
 	rootPath = t.TempDir()
-	
+
 	// Define test structure with various scenarios
 	testRepos := []struct {
 		path     string
@@ -136,40 +136,40 @@ func CreateAdvancedTestStructure(t *testing.T) (rootPath string, repos []GitRepo
 		{"skip-me", true, true, "skip-me"},
 		{"deeply/nested/structure/repo", true, false, ""},
 	}
-	
+
 	for _, tr := range testRepos {
 		fullPath := filepath.Join(rootPath, tr.path)
 		require.NoError(t, os.MkdirAll(fullPath, 0755))
-		
+
 		if tr.isGit {
 			gitDir := filepath.Join(fullPath, ".git")
 			require.NoError(t, os.Mkdir(gitDir, 0755))
 		}
-		
+
 		repos = append(repos, GitRepoInfo{
 			Path:    fullPath,
 			IsGit:   tr.isGit,
 			Skipped: tr.skip,
 		})
 	}
-	
+
 	return rootPath, repos
 }
 
 // CreateFileInDir creates a file with given content in the specified directory
 func CreateFileInDir(t *testing.T, dir, filename, content string) string {
 	t.Helper()
-	
+
 	filePath := filepath.Join(dir, filename)
 	require.NoError(t, os.WriteFile(filePath, []byte(content), 0644))
-	
+
 	return filePath
 }
 
 // AssertDirectoryExists verifies that a directory exists
 func AssertDirectoryExists(t *testing.T, path string) {
 	t.Helper()
-	
+
 	info, err := os.Stat(path)
 	require.NoError(t, err, "Directory should exist: %s", path)
 	require.True(t, info.IsDir(), "Path should be a directory: %s", path)
@@ -178,7 +178,7 @@ func AssertDirectoryExists(t *testing.T, path string) {
 // AssertFileExists verifies that a file exists
 func AssertFileExists(t *testing.T, path string) {
 	t.Helper()
-	
+
 	info, err := os.Stat(path)
 	require.NoError(t, err, "File should exist: %s", path)
 	require.False(t, info.IsDir(), "Path should be a file: %s", path)
@@ -187,7 +187,7 @@ func AssertFileExists(t *testing.T, path string) {
 // AssertIsGitRepo verifies that a directory contains a .git folder
 func AssertIsGitRepo(t *testing.T, path string) {
 	t.Helper()
-	
+
 	gitPath := filepath.Join(path, ".git")
 	AssertDirectoryExists(t, gitPath)
 }

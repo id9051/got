@@ -28,7 +28,7 @@ func styledHelp(cmd *cobra.Command, args []string) {
 	fmt.Println()
 	fmt.Println(styleHeader("Got - Git Repository Management Tool"))
 	fmt.Println()
-	
+
 	// Description
 	if cmd.Long != "" {
 		fmt.Println(cmd.Long)
@@ -36,13 +36,13 @@ func styledHelp(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Short)
 	}
 	fmt.Println()
-	
+
 	// Usage
 	if cmd.HasSubCommands() {
 		fmt.Println(headerStyle.Render("Usage:"))
 		fmt.Println("  " + pathStyle.Render(cmd.Use) + " [command]")
 		fmt.Println()
-		
+
 		// Available Commands
 		fmt.Println(headerStyle.Render("Available Commands:"))
 		for _, subcmd := range cmd.Commands() {
@@ -58,14 +58,14 @@ func styledHelp(cmd *cobra.Command, args []string) {
 		fmt.Println("  " + pathStyle.Render(cmd.Use))
 		fmt.Println()
 	}
-	
+
 	// Flags
 	if cmd.HasAvailableFlags() {
 		fmt.Println(headerStyle.Render("Flags:"))
 		printStyledFlags(cmd.Flags())
 		fmt.Println()
 	}
-	
+
 	// Examples
 	if cmd.Example != "" {
 		fmt.Println(headerStyle.Render("Examples:"))
@@ -77,7 +77,7 @@ func styledHelp(cmd *cobra.Command, args []string) {
 		}
 		fmt.Println()
 	}
-	
+
 	// Footer
 	if cmd.HasSubCommands() {
 		fmt.Println(mutedStyle.Render("Use \"" + cmd.Name() + " [command] --help\" for more information about a command."))
@@ -90,31 +90,31 @@ func printStyledFlags(flags *pflag.FlagSet) {
 		if flag.Hidden {
 			return
 		}
-		
+
 		// Format flag
 		flagStr := "  "
 		if flag.Shorthand != "" {
-			flagStr += infoStyle.Render("-"+flag.Shorthand+", ")
+			flagStr += infoStyle.Render("-" + flag.Shorthand + ", ")
 		} else {
 			flagStr += "    "
 		}
 		flagStr += infoStyle.Render("--" + flag.Name)
-		
+
 		// Add type for non-bool flags
 		if flag.Value.Type() != "bool" {
 			flagStr += " " + mutedStyle.Render(flag.Value.Type())
 		}
-		
+
 		// Add description
 		if flag.Usage != "" {
 			flagStr += "   " + flag.Usage
 		}
-		
+
 		// Add default value if set
 		if flag.DefValue != "" && flag.DefValue != "false" && flag.DefValue != "[]" {
 			flagStr += " " + mutedStyle.Render("(default: "+flag.DefValue+")")
 		}
-		
+
 		fmt.Println(flagStr)
 	})
 }

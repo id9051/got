@@ -79,7 +79,7 @@ func TestValidateDirectoryPath_WithTempDir(t *testing.T) {
 	// Test with temporary file
 	tempFile := filepath.Join(tempDir, "test.txt")
 	require.NoError(t, os.WriteFile(tempFile, []byte("test"), 0644))
-	
+
 	err = validateDirectoryPath(tempFile)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "path is not a directory")
@@ -288,30 +288,30 @@ func TestExecuteGitCommandSingle(t *testing.T) {
 func TestWalkDirectories(t *testing.T) {
 	// Create a complex directory structure for testing
 	tempDir := t.TempDir()
-	
+
 	// Create subdirectories
 	subDir1 := filepath.Join(tempDir, "repo1")
 	subDir2 := filepath.Join(tempDir, "repo2")
 	nonGitDir := filepath.Join(tempDir, "notrepo")
-	
+
 	require.NoError(t, os.MkdirAll(subDir1, 0755))
 	require.NoError(t, os.MkdirAll(subDir2, 0755))
 	require.NoError(t, os.MkdirAll(nonGitDir, 0755))
-	
+
 	// Make repo1 and repo2 git repositories
 	require.NoError(t, os.Mkdir(filepath.Join(subDir1, GitDirName), 0755))
 	require.NoError(t, os.Mkdir(filepath.Join(subDir2, GitDirName), 0755))
-	
+
 	// Track which directories the operation was called on
 	var calledPaths []string
 	testOperation := func(path string) error {
 		calledPaths = append(calledPaths, path)
 		return nil
 	}
-	
+
 	err := walkDirectories(tempDir, testOperation)
 	assert.NoError(t, err)
-	
+
 	// Should have been called on the root and all subdirectories
 	assert.Contains(t, calledPaths, tempDir)
 	assert.Contains(t, calledPaths, subDir1)
