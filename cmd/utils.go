@@ -27,6 +27,31 @@ import (
 	"github.com/pkg/errors"
 )
 
+// GitCommandRunner defines the interface for executing git commands
+// This allows for mocking during tests
+type GitCommandRunner interface {
+	RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error)
+}
+
+// RealGitCommandRunner implements GitCommandRunner using actual git commands
+type RealGitCommandRunner struct{}
+
+// RunGitCommand executes a real git command
+func (r *RealGitCommandRunner) RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error) {
+	gitCmd := exec.CommandContext(ctx, "git", args...)
+	return gitCmd.CombinedOutput()
+}
+
+// gitRunner is the global git command runner, can be replaced for testing
+var gitRunner GitCommandRunner = &RealGitCommandRunner{}
+
+// SetGitCommandRunner sets the git command runner (for testing)
+func SetGitCommandRunner(runner GitCommandRunner) GitCommandRunner {
+	oldRunner := gitRunner
+	gitRunner = runner
+	return oldRunner
+}
+
 // Constants for commonly used strings
 const (
 	GitDirName          = ".git"
@@ -140,14 +165,12 @@ func runGitCommand(ctx context.Context, path string, gitArgs ...string) error {
 	}
 	args = append(args, gitArgs...)
 
-	gitCmd := exec.CommandContext(ctx, "git", args...)
-
 	// For status command, we want to show output to user but need to handle progress bar
 	var output []byte
 	var err error
 	if len(gitArgs) > 0 && gitArgs[0] == "status" {
 		// Capture output instead of sending directly to stdout to avoid interfering with progress bar
-		output, err = gitCmd.CombinedOutput()
+		output, err = gitRunner.RunGitCommand(ctx, path, args)
 	}
 
 	// Show operation in progress
@@ -186,7 +209,7 @@ func runGitCommand(ctx context.Context, path string, gitArgs ...string) error {
 		}
 
 		// Run the command for non-status operations
-		err = gitCmd.Run()
+		_, err = gitRunner.RunGitCommand(ctx, path, args)
 		close(done)
 
 		if !inProgressMode {

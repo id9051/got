@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/testutil"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -132,6 +133,12 @@ func TestPullCmd_FlagHandling(t *testing.T) {
 }
 
 func TestPullSingle(t *testing.T) {
+	// Install mock git runner for all tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
 	tests := []struct {
 		name     string
 		setupDir func(t *testing.T) string
@@ -152,9 +159,13 @@ func TestPullSingle(t *testing.T) {
 				tempDir := t.TempDir()
 				gitDir := filepath.Join(tempDir, GitDirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
+				
+				// Configure mock to return success for pull command
+				mockGit.SetOutput("pull", "mock pull output")
+				
 				return tempDir
 			},
-			wantErr: false, // Function returns nil even if git command fails
+			wantErr: false, // Function returns nil with mocked git command
 		},
 	}
 
@@ -185,6 +196,15 @@ func TestPullCmd_Examples(t *testing.T) {
 }
 
 func TestPullCmd_Integration(t *testing.T) {
+	// Install mock git runner for integration tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
+	// Configure mock to return success for pull command
+	mockGit.SetOutput("pull", "mock pull output")
+
 	// Create a complex directory structure for integration testing
 	tempDir := t.TempDir()
 
@@ -211,7 +231,7 @@ func TestPullCmd_Integration(t *testing.T) {
 	t.Run("pull functions work correctly", func(t *testing.T) {
 		// Test pullSingle function directly
 		err := pullSingle(context.Background(), repo1)
-		assert.NoError(t, err) // Should not error even if git command fails
+		assert.NoError(t, err) // Should not error with mocked git command
 
 		// Test with non-git repo
 		err = pullSingle(context.Background(), nonRepo)

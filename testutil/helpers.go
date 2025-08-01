@@ -16,8 +16,10 @@
 package testutil
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -234,4 +236,91 @@ func FilterNonSkippedRepos(repos []GitRepoInfo) []GitRepoInfo {
 		}
 	}
 	return nonSkipped
+}
+
+// MockGitCommandRunner is a mock implementation of GitCommandRunnerInterface for testing
+type MockGitCommandRunner struct {
+	// Commands stores the commands that were executed for verification
+	Commands [][]string
+	// Outputs maps command strings to output that should be returned
+	Outputs map[string]string
+	// Errors maps command strings to errors that should be returned
+	Errors map[string]error
+}
+
+// NewMockGitCommandRunner creates a new mock git command runner
+func NewMockGitCommandRunner() *MockGitCommandRunner {
+	return &MockGitCommandRunner{
+		Commands: make([][]string, 0),
+		Outputs:  make(map[string]string),
+		Errors:   make(map[string]error),
+	}
+}
+
+// RunGitCommand mocks git command execution
+func (m *MockGitCommandRunner) RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error) {
+	// Record the command that was executed
+	m.Commands = append(m.Commands, args)
+	
+	// Create a key from the git command (excluding work-tree and git-dir args)
+	var gitArgs []string
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "--work-tree=") && !strings.HasPrefix(arg, "--git-dir=") {
+			gitArgs = append(gitArgs, arg)
+		}
+	}
+	cmdKey := strings.Join(gitArgs, " ")
+	
+	// Return configured error if exists
+	if err, exists := m.Errors[cmdKey]; exists {
+		return nil, err
+	}
+	
+	// Return configured output if exists
+	if output, exists := m.Outputs[cmdKey]; exists {
+		return []byte(output), nil
+	}
+	
+	// Default successful response
+	return []byte("mock git output"), nil
+}
+
+// SetOutput configures the mock to return specific output for a git command
+func (m *MockGitCommandRunner) SetOutput(command, output string) {
+	m.Outputs[command] = output
+}
+
+// SetError configures the mock to return an error for a git command
+func (m *MockGitCommandRunner) SetError(command string, err error) {
+	m.Errors[command] = err
+}
+
+// GetExecutedCommands returns all commands that were executed
+func (m *MockGitCommandRunner) GetExecutedCommands() [][]string {
+	return m.Commands
+}
+
+// GitCommandRunnerInterface defines the interface for git command execution
+// This is defined here to avoid circular imports
+type GitCommandRunnerInterface interface {
+	RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error)
+}
+
+// InstallMockGitRunner installs a mock git command runner for testing
+// This function should be called from test files in the cmd package
+// Returns the mock runner and a cleanup function
+func InstallMockGitRunner(t *testing.T, setRunnerFunc func(GitCommandRunnerInterface) GitCommandRunnerInterface) (*MockGitCommandRunner, func()) {
+	t.Helper()
+	mock := NewMockGitCommandRunner()
+	
+	// Install the mock using the provided setter function
+	originalRunner := setRunnerFunc(mock)
+	
+	cleanup := func() {
+		t.Helper()
+		// Restore the original runner
+		setRunnerFunc(originalRunner)
+	}
+	
+	return mock, cleanup
 }

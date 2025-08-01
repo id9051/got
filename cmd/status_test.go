@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/testutil"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,6 +126,12 @@ func TestStatusCmd_FlagHandling(t *testing.T) {
 }
 
 func TestStatusSingle(t *testing.T) {
+	// Install mock git runner for all tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
 	tests := []struct {
 		name     string
 		setupDir func(t *testing.T) string
@@ -145,9 +152,13 @@ func TestStatusSingle(t *testing.T) {
 				tempDir := t.TempDir()
 				gitDir := filepath.Join(tempDir, GitDirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
+				
+				// Configure mock to return success for status command
+				mockGit.SetOutput("status", "mock status output")
+				
 				return tempDir
 			},
-			wantErr: false, // Function returns nil even if git command fails
+			wantErr: false, // Function returns nil with mocked git command
 		},
 	}
 
@@ -188,6 +199,15 @@ func TestStatusCmd_UniqueFeatures(t *testing.T) {
 }
 
 func TestStatusCmd_OutputHandling(t *testing.T) {
+	// Install mock git runner
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
+	// Configure mock to return status output
+	mockGit.SetOutput("status", "mock status output")
+
 	// Status command should show output to user (unlike pull/fetch)
 	// This is tested indirectly through the runGitCommand function
 	// which has special handling for status commands
@@ -199,10 +219,19 @@ func TestStatusCmd_OutputHandling(t *testing.T) {
 
 	// The status command should not error on execution path
 	err := statusSingle(context.Background(), tempDir)
-	assert.NoError(t, err) // Returns nil even if git command fails
+	assert.NoError(t, err) // Returns nil with mocked git command
 }
 
 func TestStatusCmd_Integration(t *testing.T) {
+	// Install mock git runner for integration tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
+	// Configure mock to return success for status command
+	mockGit.SetOutput("status", "mock status output")
+
 	// Create a complex directory structure for integration testing
 	tempDir := t.TempDir()
 
@@ -229,7 +258,7 @@ func TestStatusCmd_Integration(t *testing.T) {
 	t.Run("status functions work correctly", func(t *testing.T) {
 		// Test statusSingle function directly
 		err := statusSingle(context.Background(), repo1)
-		assert.NoError(t, err) // Should not error even if git command fails
+		assert.NoError(t, err) // Should not error with mocked git command
 
 		// Test with non-git repo
 		err = statusSingle(context.Background(), nonRepo)

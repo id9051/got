@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -241,6 +242,12 @@ func TestExecuteGitCommand(t *testing.T) {
 }
 
 func TestExecuteGitCommandSingle(t *testing.T) {
+	// Install mock git runner for all tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
 	tests := []struct {
 		name     string
 		setupDir func(t *testing.T) string
@@ -263,10 +270,14 @@ func TestExecuteGitCommandSingle(t *testing.T) {
 				tempDir := t.TempDir()
 				gitDir := filepath.Join(tempDir, GitDirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
+				
+				// Configure mock to return success for status command
+				mockGit.SetOutput("status", "mock status output")
+				
 				return tempDir
 			},
 			gitArgs: []string{"status"},
-			wantErr: false, // Function returns nil even if git command fails
+			wantErr: false, // Function returns nil with mocked git command
 		},
 	}
 

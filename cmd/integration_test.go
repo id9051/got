@@ -109,6 +109,17 @@ func TestRecursiveOperations_Integration(t *testing.T) {
 }
 
 func TestFullCommandExecution_Integration(t *testing.T) {
+	// Install mock git runner for integration tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
+	// Configure mock to return success for all git commands
+	mockGit.SetOutput("pull", "mock pull output")
+	mockGit.SetOutput("fetch", "mock fetch output")
+	mockGit.SetOutput("status", "mock status output")
+
 	// Create a simpler test structure for command execution
 	_, dirs := testutil.CreateTestDirStructure(t)
 
@@ -119,13 +130,13 @@ func TestFullCommandExecution_Integration(t *testing.T) {
 
 		// Test single functions directly
 		err := pullSingle(ctx, repo1Path)
-		assert.NoError(t, err) // Should not error even if git fails
+		assert.NoError(t, err) // Should not error with mocked git commands
 
 		err = fetchSingle(ctx, repo1Path)
-		assert.NoError(t, err) // Should not error even if git fails
+		assert.NoError(t, err) // Should not error with mocked git commands
 
 		err = statusSingle(ctx, repo1Path)
-		assert.NoError(t, err) // Should not error even if git fails
+		assert.NoError(t, err) // Should not error with mocked git commands
 	})
 
 	t.Run("single functions fail with non-git repo", func(t *testing.T) {

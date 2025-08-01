@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/testutil"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,6 +127,12 @@ func TestFetchCmd_FlagHandling(t *testing.T) {
 }
 
 func TestFetchSingle(t *testing.T) {
+	// Install mock git runner for all tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
 	tests := []struct {
 		name     string
 		setupDir func(t *testing.T) string
@@ -146,9 +153,13 @@ func TestFetchSingle(t *testing.T) {
 				tempDir := t.TempDir()
 				gitDir := filepath.Join(tempDir, GitDirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
+				
+				// Configure mock to return success for fetch command
+				mockGit.SetOutput("fetch", "mock fetch output")
+				
 				return tempDir
 			},
-			wantErr: false, // Function returns nil even if git command fails
+			wantErr: false, // Function returns nil with mocked git command
 		},
 	}
 
@@ -190,6 +201,15 @@ func TestFetchCmd_DifferenceFromPull(t *testing.T) {
 }
 
 func TestFetchCmd_Integration(t *testing.T) {
+	// Install mock git runner for integration tests
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+		return SetGitCommandRunner(runner)
+	})
+	defer cleanup()
+
+	// Configure mock to return success for fetch command
+	mockGit.SetOutput("fetch", "mock fetch output")
+
 	// Create a complex directory structure for integration testing
 	tempDir := t.TempDir()
 
@@ -217,7 +237,7 @@ func TestFetchCmd_Integration(t *testing.T) {
 		ctx := context.Background()
 		// Test fetchSingle function directly
 		err := fetchSingle(ctx, repo1)
-		assert.NoError(t, err) // Should not error even if git command fails
+		assert.NoError(t, err) // Should not error with mocked git command
 
 		// Test with non-git repo
 		err = fetchSingle(ctx, nonRepo)
