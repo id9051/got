@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package main is the entry point for the Got CLI tool.
+// Got is a command-line tool for managing multiple Git repositories,
+// allowing users to perform git operations across single repositories
+// or recursively across directory trees containing multiple repositories.
 package main
 
 import "github.com/id9051/got/cmd"

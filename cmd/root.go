@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package cmd provides the command-line interface for the Got CLI tool.
+// It implements Cobra commands for git repository management operations
+// including pull, fetch, and status commands that can operate on single
+// repositories or recursively across directory trees.
 package cmd
 
 import (
