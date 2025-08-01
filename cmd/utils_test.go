@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/internal/git"
 	"github.com/id9051/got/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,7 +98,7 @@ func TestIsGitRepository(t *testing.T) {
 			name: "directory with .git folder",
 			setupDir: func(t *testing.T) string {
 				tempDir := t.TempDir()
-				gitDir := filepath.Join(tempDir, GitDirName)
+				gitDir := filepath.Join(tempDir, git.DirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 				return tempDir
 			},
@@ -219,7 +220,7 @@ func TestExecuteGitCommand(t *testing.T) {
 			name: "git directory with invalid command",
 			setupDir: func(t *testing.T) string {
 				tempDir := t.TempDir()
-				gitDir := filepath.Join(tempDir, GitDirName)
+				gitDir := filepath.Join(tempDir, git.DirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 				return tempDir
 			},
@@ -243,7 +244,7 @@ func TestExecuteGitCommand(t *testing.T) {
 
 func TestExecuteGitCommandSingle(t *testing.T) {
 	// Install mock git runner for all tests
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
@@ -268,7 +269,7 @@ func TestExecuteGitCommandSingle(t *testing.T) {
 			name: "git directory processes command",
 			setupDir: func(t *testing.T) string {
 				tempDir := t.TempDir()
-				gitDir := filepath.Join(tempDir, GitDirName)
+				gitDir := filepath.Join(tempDir, git.DirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 				
 				// Configure mock to return success for status command
@@ -311,8 +312,8 @@ func TestWalkDirectories(t *testing.T) {
 	require.NoError(t, os.MkdirAll(nonGitDir, 0755))
 
 	// Make repo1 and repo2 git repositories
-	require.NoError(t, os.Mkdir(filepath.Join(subDir1, GitDirName), 0755))
-	require.NoError(t, os.Mkdir(filepath.Join(subDir2, GitDirName), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(subDir1, git.DirName), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(subDir2, git.DirName), 0755))
 
 	// Track which directories the operation was called on
 	var calledPaths []string

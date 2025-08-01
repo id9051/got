@@ -18,43 +18,22 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/id9051/got/internal/git"
 	"github.com/pkg/errors"
 )
 
-// GitCommandRunner defines the interface for executing git commands
-// This allows for mocking during tests
-type GitCommandRunner interface {
-	RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error)
-}
-
-// RealGitCommandRunner implements GitCommandRunner using actual git commands
-type RealGitCommandRunner struct{}
-
-// RunGitCommand executes a real git command
-func (r *RealGitCommandRunner) RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error) {
-	gitCmd := exec.CommandContext(ctx, "git", args...)
-	return gitCmd.CombinedOutput()
-}
-
-// gitRunner is the global git command runner, can be replaced for testing
-var gitRunner GitCommandRunner = &RealGitCommandRunner{}
-
 // SetGitCommandRunner sets the git command runner (for testing)
-func SetGitCommandRunner(runner GitCommandRunner) GitCommandRunner {
-	oldRunner := gitRunner
-	gitRunner = runner
-	return oldRunner
+func SetGitCommandRunner(runner git.CommandRunner) git.CommandRunner {
+	return git.SetCommandRunner(runner)
 }
 
 // Constants for commonly used strings
 const (
-	GitDirName          = ".git"
 	RecursiveFlagName   = "recursive"
 	ErrorWalkingMessage = "error walking filepath [%s]"
 	SkippingMessage     = "Skipping [%s]"
@@ -98,8 +77,7 @@ func validateDirectoryPath(path string) error {
 
 // isGitRepository checks if the given path contains a git repository
 func isGitRepository(path string) bool {
-	_, err := os.Stat(filepath.Join(path, GitDirName))
-	return err == nil
+	return git.IsRepository(path)
 }
 
 // shouldSkipPath checks if a path should be skipped based on the skip list
@@ -125,142 +103,70 @@ func logError(path string, err error) {
 	fmt.Println(styleError(path, err))
 }
 
-// GitOutput stores the output of a git command for later display
-type GitOutput struct {
-	Path   string
-	Output string
-	Error  error
-}
-
-var gitOutputBuffer []GitOutput
+var gitOutputBuffer []git.Output
 var inProgressMode bool
 
 // executeGitCommand executes a git command in the specified directory with context
 // For recursive operations - silently skips non-git directories
 func executeGitCommand(ctx context.Context, path string, gitArgs ...string) error {
-	// Skip non-git directories silently during recursive operations
-	if !isGitRepository(path) {
-		return nil
+	config := &git.OperationConfig{
+		ProgressMode:    inProgressMode,
+		OutputBufferPtr: &gitOutputBuffer,
+		LogSkipped:      logSkipped,
+		LogSuccess:      logSuccess,
+		LogError:        logError,
+		ShowSpinner:     showSpinner,
 	}
 
-	return runGitCommand(ctx, path, gitArgs...)
+	return git.ExecuteCommand(ctx, path, config, gitArgs...)
 }
 
 // executeGitCommandSingle executes a git command on a single directory with context
 // For single directory operations - returns error if not a git repository
 func executeGitCommandSingle(ctx context.Context, path string, gitArgs ...string) error {
-	if !isGitRepository(path) {
-		return errors.Errorf("[%s] is not a git repository", path)
+	config := &git.OperationConfig{
+		ProgressMode:    inProgressMode,
+		OutputBufferPtr: &gitOutputBuffer,
+		LogSkipped:      logSkipped,
+		LogSuccess:      logSuccess,
+		LogError:        logError,
+		ShowSpinner:     showSpinner,
 	}
 
-	return runGitCommand(ctx, path, gitArgs...)
+	return git.ExecuteCommandSingle(ctx, path, config, gitArgs...)
 }
 
-// runGitCommand is the shared implementation for running git commands with context
-func runGitCommand(ctx context.Context, path string, gitArgs ...string) error {
-	// Build git command with explicit work-tree and git-dir
-	args := []string{
-		fmt.Sprintf("--work-tree=%s", path),
-		fmt.Sprintf("--git-dir=%s", filepath.Join(path, GitDirName)),
-	}
-	args = append(args, gitArgs...)
-
-	// For status command, we want to show output to user but need to handle progress bar
-	var output []byte
-	var err error
-	if len(gitArgs) > 0 && gitArgs[0] == "status" {
-		// Capture output instead of sending directly to stdout to avoid interfering with progress bar
-		output, err = gitRunner.RunGitCommand(ctx, path, args)
-	}
-
-	// Show operation in progress
-	operation := "operation"
-	if len(gitArgs) > 0 {
-		operation = gitArgs[0]
-	}
-
-	// Start spinner for non-status commands
+// showSpinner creates and manages a spinner for git operations
+func showSpinner(operation, path string) (chan bool, error) {
 	spinner := NewSpinner()
 	done := make(chan bool)
 
-	if operation != "status" {
-		if !inProgressMode {
-			// Only show spinner when not in progress mode
-			go func() {
-				ticker := time.NewTicker(100 * time.Millisecond)
-				defer ticker.Stop()
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
 
-				for {
-					select {
-					case <-done:
-						fmt.Print("\r\033[K") // Clear line
-						return
-					case <-ctx.Done():
-						fmt.Print("\r\033[K") // Clear line
-						return
-					case <-ticker.C:
-						fmt.Printf("\r%s %s %s",
-							spinner.Next(),
-							infoStyle.Render("Running git "+operation+" on"),
-							pathStyle.Render(path))
-					}
-				}
-			}()
+		for {
+			select {
+			case <-done:
+				fmt.Print("\r\033[K") // Clear line
+				return
+			case <-ticker.C:
+				fmt.Printf("\r%s %s %s",
+					spinner.Next(),
+					infoStyle.Render("Running git "+operation+" on"),
+					pathStyle.Render(path))
+			}
 		}
+	}()
 
-		// Run the command for non-status operations
-		_, err = gitRunner.RunGitCommand(ctx, path, args)
-		close(done)
-
-		if !inProgressMode {
-			time.Sleep(50 * time.Millisecond) // Brief pause to ensure spinner cleanup
-			fmt.Print("\r\033[K")             // Clear line
-		}
-	}
-	// For status commands, output was already captured above
-
-	// Check for context cancellation
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
-	if err != nil {
-		logError(path, err)
-		return nil // Don't stop processing other repositories
-	}
-
-	// Handle output display based on mode
-	if operation == "status" && len(output) > 0 {
-		if inProgressMode {
-			// Buffer the output for later display
-			gitOutputBuffer = append(gitOutputBuffer, GitOutput{
-				Path:   path,
-				Output: string(output),
-				Error:  nil,
-			})
-		} else {
-			// Display immediately for single operations
-			fmt.Print(string(output))
-		}
-	}
-
-	// Always log success, but handle it differently in progress mode
-	if inProgressMode {
-		// In progress mode, print success immediately after clearing progress line
-		fmt.Print("\r\033[K") // Clear progress line
-		logSuccess(path)
-		// Let the progress bar re-render on next update
-	} else {
-		logSuccess(path)
-	}
-	return nil
+	return done, nil
 }
 
 // walkDirectories is a generic function for walking directories and applying git operations
 func walkDirectories(ctx context.Context, rootPath string, gitOperation func(context.Context, string) error) error {
 	// Enable progress mode and clear output buffer
 	inProgressMode = true
-	gitOutputBuffer = []GitOutput{}
+	gitOutputBuffer = []git.Output{}
 
 	// First, count total directories for progress bar (applying same optimization logic)
 	totalDirs := 0
@@ -271,7 +177,7 @@ func walkDirectories(ctx context.Context, rootPath string, gitOperation func(con
 		}
 
 		// Skip .git directories
-		if filepath.Base(path) == GitDirName {
+		if filepath.Base(path) == git.DirName {
 			return filepath.SkipDir
 		}
 
@@ -327,7 +233,7 @@ func walkDirectories(ctx context.Context, rootPath string, gitOperation func(con
 		dirCount++
 
 		// Skip .git directories
-		if filepath.Base(path) == GitDirName {
+		if filepath.Base(path) == git.DirName {
 			return filepath.SkipDir
 		}
 

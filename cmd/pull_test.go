@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/internal/git"
 	"github.com/id9051/got/testutil"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -134,7 +135,7 @@ func TestPullCmd_FlagHandling(t *testing.T) {
 
 func TestPullSingle(t *testing.T) {
 	// Install mock git runner for all tests
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
@@ -157,7 +158,7 @@ func TestPullSingle(t *testing.T) {
 			name: "git directory",
 			setupDir: func(t *testing.T) string {
 				tempDir := t.TempDir()
-				gitDir := filepath.Join(tempDir, GitDirName)
+				gitDir := filepath.Join(tempDir, git.DirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 				
 				// Configure mock to return success for pull command
@@ -197,7 +198,7 @@ func TestPullCmd_Examples(t *testing.T) {
 
 func TestPullCmd_Integration(t *testing.T) {
 	// Install mock git runner for integration tests
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
@@ -218,8 +219,8 @@ func TestPullCmd_Integration(t *testing.T) {
 	require.NoError(t, os.MkdirAll(nonRepo, 0755))
 
 	// Make repo1 and repo2 git repositories
-	require.NoError(t, os.Mkdir(filepath.Join(repo1, GitDirName), 0755))
-	require.NoError(t, os.Mkdir(filepath.Join(repo2, GitDirName), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(repo1, git.DirName), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(repo2, git.DirName), 0755))
 
 	t.Run("git repository detection", func(t *testing.T) {
 		// Test git repository detection directly

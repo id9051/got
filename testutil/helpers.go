@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/id9051/got/internal/git"
 	"github.com/stretchr/testify/require"
 )
 
@@ -238,7 +239,7 @@ func FilterNonSkippedRepos(repos []GitRepoInfo) []GitRepoInfo {
 	return nonSkipped
 }
 
-// MockGitCommandRunner is a mock implementation of GitCommandRunnerInterface for testing
+// MockGitCommandRunner is a mock implementation of git.CommandRunner for testing
 type MockGitCommandRunner struct {
 	// Commands stores the commands that were executed for verification
 	Commands [][]string
@@ -300,16 +301,13 @@ func (m *MockGitCommandRunner) GetExecutedCommands() [][]string {
 	return m.Commands
 }
 
-// GitCommandRunnerInterface defines the interface for git command execution
-// This is defined here to avoid circular imports
-type GitCommandRunnerInterface interface {
-	RunGitCommand(ctx context.Context, path string, args []string) ([]byte, error)
-}
+// GitCommandRunnerInterface is an alias for git.CommandRunner to avoid circular imports
+type GitCommandRunnerInterface = git.CommandRunner
 
 // InstallMockGitRunner installs a mock git command runner for testing
 // This function should be called from test files in the cmd package
 // Returns the mock runner and a cleanup function
-func InstallMockGitRunner(t *testing.T, setRunnerFunc func(GitCommandRunnerInterface) GitCommandRunnerInterface) (*MockGitCommandRunner, func()) {
+func InstallMockGitRunner(t *testing.T, setRunnerFunc func(git.CommandRunner) git.CommandRunner) (*MockGitCommandRunner, func()) {
 	t.Helper()
 	mock := NewMockGitCommandRunner()
 	

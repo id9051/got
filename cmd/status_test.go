@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/internal/git"
 	"github.com/id9051/got/testutil"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -127,7 +128,7 @@ func TestStatusCmd_FlagHandling(t *testing.T) {
 
 func TestStatusSingle(t *testing.T) {
 	// Install mock git runner for all tests
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
@@ -150,7 +151,7 @@ func TestStatusSingle(t *testing.T) {
 			name: "git directory",
 			setupDir: func(t *testing.T) string {
 				tempDir := t.TempDir()
-				gitDir := filepath.Join(tempDir, GitDirName)
+				gitDir := filepath.Join(tempDir, git.DirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 				
 				// Configure mock to return success for status command
@@ -200,7 +201,7 @@ func TestStatusCmd_UniqueFeatures(t *testing.T) {
 
 func TestStatusCmd_OutputHandling(t *testing.T) {
 	// Install mock git runner
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
@@ -214,7 +215,7 @@ func TestStatusCmd_OutputHandling(t *testing.T) {
 
 	// We can verify that the status command uses the same git execution path
 	tempDir := t.TempDir()
-	gitDir := filepath.Join(tempDir, GitDirName)
+	gitDir := filepath.Join(tempDir, git.DirName)
 	require.NoError(t, os.Mkdir(gitDir, 0755))
 
 	// The status command should not error on execution path
@@ -224,7 +225,7 @@ func TestStatusCmd_OutputHandling(t *testing.T) {
 
 func TestStatusCmd_Integration(t *testing.T) {
 	// Install mock git runner for integration tests
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
@@ -245,8 +246,8 @@ func TestStatusCmd_Integration(t *testing.T) {
 	require.NoError(t, os.MkdirAll(nonRepo, 0755))
 
 	// Make repo1 and repo2 git repositories
-	require.NoError(t, os.Mkdir(filepath.Join(repo1, GitDirName), 0755))
-	require.NoError(t, os.Mkdir(filepath.Join(repo2, GitDirName), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(repo1, git.DirName), 0755))
+	require.NoError(t, os.Mkdir(filepath.Join(repo2, git.DirName), 0755))
 
 	t.Run("git repository detection", func(t *testing.T) {
 		// Test git repository detection directly

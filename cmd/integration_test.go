@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/id9051/got/internal/git"
 	"github.com/id9051/got/testutil"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -110,7 +111,7 @@ func TestRecursiveOperations_Integration(t *testing.T) {
 
 func TestFullCommandExecution_Integration(t *testing.T) {
 	// Install mock git runner for integration tests
-	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner testutil.GitCommandRunnerInterface) testutil.GitCommandRunnerInterface {
+	mockGit, cleanup := testutil.InstallMockGitRunner(t, func(runner git.CommandRunner) git.CommandRunner {
 		return SetGitCommandRunner(runner)
 	})
 	defer cleanup()
