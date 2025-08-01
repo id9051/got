@@ -257,22 +257,3 @@ func TestErrorHandling_Integration(t *testing.T) {
 	})
 }
 
-func TestDeprecatedFunctions_Integration(t *testing.T) {
-	// Test that deprecated walk functions still work for backward compatibility
-	rootPath := testutil.CreateTempGitRepo(t)
-
-	t.Run("deprecated pullWalk function", func(t *testing.T) {
-		err := pullWalk(rootPath)
-		assert.NoError(t, err)
-	})
-
-	t.Run("deprecated fetchWalk function", func(t *testing.T) {
-		err := fetchWalk(rootPath)
-		assert.NoError(t, err)
-	})
-
-	t.Run("deprecated statusWalk function", func(t *testing.T) {
-		err := statusWalk(rootPath)
-		assert.NoError(t, err)
-	})
-}

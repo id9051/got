@@ -168,18 +168,6 @@ func TestStatusSingle(t *testing.T) {
 	}
 }
 
-func TestStatusWalk(t *testing.T) {
-	// Test the deprecated statusWalk function
-	tempDir := t.TempDir()
-
-	// Create a git repository
-	gitDir := filepath.Join(tempDir, GitDirName)
-	require.NoError(t, os.Mkdir(gitDir, 0755))
-
-	// statusWalk should not return an error (it returns nil even on git failures)
-	err := statusWalk(tempDir)
-	assert.NoError(t, err)
-}
 
 func TestStatusCmd_Examples(t *testing.T) {
 	// Test that examples are properly formatted and present

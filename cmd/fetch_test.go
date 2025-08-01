@@ -170,18 +170,6 @@ func TestFetchSingle(t *testing.T) {
 	}
 }
 
-func TestFetchWalk(t *testing.T) {
-	// Test the deprecated fetchWalk function
-	tempDir := t.TempDir()
-
-	// Create a git repository
-	gitDir := filepath.Join(tempDir, GitDirName)
-	require.NoError(t, os.Mkdir(gitDir, 0755))
-
-	// fetchWalk should not return an error (it returns nil even on git failures)
-	err := fetchWalk(tempDir)
-	assert.NoError(t, err)
-}
 
 func TestFetchCmd_Examples(t *testing.T) {
 	// Test that examples are properly formatted and present

@@ -86,14 +86,3 @@ func statusSingle(ctx context.Context, path string) error {
 	return executeGitCommandSingle(ctx, path, "status")
 }
 
-// statusWalk is deprecated - functionality moved to walkDirectories in utils.go
-// Kept for backward compatibility but now just calls the generic walker
-func statusWalk(path string) error {
-	ctx := globalCtx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return walkDirectories(ctx, path, func(ctx context.Context, path string) error {
-		return executeGitCommand(ctx, path, "status")
-	})
-}

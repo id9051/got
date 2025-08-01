@@ -175,18 +175,6 @@ func TestPullSingle(t *testing.T) {
 	}
 }
 
-func TestPullWalk(t *testing.T) {
-	// Test the deprecated pullWalk function
-	tempDir := t.TempDir()
-
-	// Create a git repository
-	gitDir := filepath.Join(tempDir, GitDirName)
-	require.NoError(t, os.Mkdir(gitDir, 0755))
-
-	// pullWalk should not return an error (it returns nil even on git failures)
-	err := pullWalk(tempDir)
-	assert.NoError(t, err)
-}
 
 func TestPullCmd_Examples(t *testing.T) {
 	// Test that examples are properly formatted and present
