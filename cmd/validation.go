@@ -64,9 +64,35 @@ func isGitRepository(path string) bool {
 }
 
 // shouldSkipPath checks if a path should be skipped based on the skip list
+// Uses proper path segment matching instead of substring matching to avoid false positives
 func shouldSkipPath(path string) bool {
 	skipList := getSkipList()
 	return slices.ContainsFunc(skipList, func(skip string) bool {
-		return strings.Contains(path, skip)
+		return matchesSkipPattern(path, skip)
 	})
+}
+
+// matchesSkipPattern checks if a path matches a skip pattern using proper path segment matching
+func matchesSkipPattern(path, pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+
+	// Clean the path to normalize separators and remove redundant elements
+	cleanPath := filepath.Clean(path)
+
+	// Split path into segments
+	pathSegments := strings.Split(cleanPath, string(filepath.Separator))
+
+	// Check if any path segment exactly matches the pattern
+	if slices.Contains(pathSegments, pattern) {
+		return true
+	}
+
+	// Also check if the pattern matches the entire path (for absolute patterns)
+	if cleanPath == pattern || filepath.Base(cleanPath) == pattern {
+		return true
+	}
+
+	return false
 }

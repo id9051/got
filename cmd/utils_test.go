@@ -22,6 +22,7 @@ import (
 
 	"github.com/id9051/got/internal/git"
 	"github.com/id9051/got/testutil"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -130,8 +131,14 @@ func TestIsGitRepository(t *testing.T) {
 }
 
 func TestShouldSkipPath(t *testing.T) {
-	// Note: In a real implementation, we'd need to reset viper state
-	// For now, this test will work with whatever is configured
+	// Save and restore viper state
+	originalConfig := viper.AllSettings()
+	defer func() {
+		viper.Reset()
+		for key, value := range originalConfig {
+			viper.Set(key, value)
+		}
+	}()
 
 	tests := []struct {
 		name     string
@@ -146,7 +153,7 @@ func TestShouldSkipPath(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "path contains skip item",
+			name:     "path segment matches skip item",
 			path:     "/path/to/node_modules/package",
 			skipList: []string{"node_modules"},
 			expected: true,
@@ -157,25 +164,190 @@ func TestShouldSkipPath(t *testing.T) {
 			skipList: []string{},
 			expected: false,
 		},
+		{
+			name:     "false positive prevention - substring in directory name",
+			path:     "/project/vendor-tools/repo",
+			skipList: []string{"vendor"},
+			expected: false, // Should NOT be skipped because "vendor" is not a complete segment
+		},
+		{
+			name:     "false positive prevention - substring in file name",
+			path:     "/project/my-vendor-app/src",
+			skipList: []string{"vendor"},
+			expected: false, // Should NOT be skipped
+		},
+		{
+			name:     "exact segment match",
+			path:     "/project/vendor/package",
+			skipList: []string{"vendor"},
+			expected: true, // Should be skipped because "vendor" is an exact segment
+		},
+		{
+			name:     "basename match",
+			path:     "/project/tools/vendor",
+			skipList: []string{"vendor"},
+			expected: true, // Should be skipped because basename is "vendor"
+		},
+		{
+			name:     "multiple segments with match",
+			path:     "/home/user/.git/hooks/pre-commit",
+			skipList: []string{".git"},
+			expected: true,
+		},
+		{
+			name:     "nested path with skip pattern",
+			path:     "/project/src/node_modules/package/lib",
+			skipList: []string{"node_modules"},
+			expected: true,
+		},
+		{
+			name:     "case sensitive matching",
+			path:     "/project/Node_Modules/package",
+			skipList: []string{"node_modules"},
+			expected: false, // Case sensitive - should not match
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// For this test, we'll test the logic directly
-			// In production, we'd mock viper or use dependency injection
-			found := false
-			for _, skip := range tt.skipList {
-				if skip != "" && filepath.Base(tt.path) == skip {
-					found = true
-					break
-				}
-			}
-			// This is a simplified version of the actual logic
-			// The real shouldSkipPath uses strings.Contains
-			if tt.name == "path contains skip item" {
-				found = true
-			}
-			assert.Equal(t, tt.expected, found)
+			// Reset viper and set up test configuration
+			viper.Reset()
+			viper.Set("skipList", tt.skipList)
+			viper.Set("useDefaultSkips", false) // Disable defaults for predictable testing
+
+			result := shouldSkipPath(tt.path)
+			assert.Equal(t, tt.expected, result, "Skip check failed for path: %s with skipList: %v", tt.path, tt.skipList)
+		})
+	}
+}
+
+func TestMatchesSkipPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		pattern  string
+		expected bool
+	}{
+		{
+			name:     "exact segment match",
+			path:     "/project/vendor/package",
+			pattern:  "vendor",
+			expected: true,
+		},
+		{
+			name:     "substring in segment - should not match",
+			path:     "/project/vendor-tools/package",
+			pattern:  "vendor",
+			expected: false,
+		},
+		{
+			name:     "basename match",
+			path:     "/project/tools/vendor",
+			pattern:  "vendor",
+			expected: true,
+		},
+		{
+			name:     "empty pattern",
+			path:     "/any/path",
+			pattern:  "",
+			expected: false,
+		},
+		{
+			name:     "pattern matches entire path",
+			path:     "/vendor",
+			pattern:  "/vendor",
+			expected: true,
+		},
+		{
+			name:     "pattern in middle of path",
+			path:     "/home/user/node_modules/package",
+			pattern:  "node_modules",
+			expected: true,
+		},
+		{
+			name:     "case sensitive - no match",
+			path:     "/project/Vendor/package",
+			pattern:  "vendor",
+			expected: false,
+		},
+		{
+			name:     "dotfile pattern",
+			path:     "/project/.git/hooks",
+			pattern:  ".git",
+			expected: true,
+		},
+		{
+			name:     "complex path with multiple separators",
+			path:     "/home/user//project/./vendor/../vendor/lib",
+			pattern:  "vendor",
+			expected: true, // filepath.Clean should normalize this
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := matchesSkipPattern(tt.path, tt.pattern)
+			assert.Equal(t, tt.expected, result, "Pattern match failed for path: %s, pattern: %s", tt.path, tt.pattern)
+		})
+	}
+}
+
+func TestSkipPathLogicFix(t *testing.T) {
+	// This test demonstrates the fix for the false positive issue
+	// where paths containing skip terms as substrings were incorrectly skipped
+
+	// Save and restore viper state
+	originalConfig := viper.AllSettings()
+	defer func() {
+		viper.Reset()
+		for key, value := range originalConfig {
+			viper.Set(key, value)
+		}
+	}()
+
+	// Set up test configuration
+	viper.Reset()
+	viper.Set("skipList", []string{"vendor", "node_modules"})
+	viper.Set("useDefaultSkips", false)
+
+	testCases := []struct {
+		path        string
+		shouldSkip  bool
+		description string
+	}{
+		{
+			path:        "/project/vendor/package",
+			shouldSkip:  true,
+			description: "Exact segment match - should be skipped",
+		},
+		{
+			path:        "/project/vendor-tools/repo",
+			shouldSkip:  false,
+			description: "False positive prevention - substring in directory name should NOT be skipped",
+		},
+		{
+			path:        "/project/my-vendor-app/src",
+			shouldSkip:  false,
+			description: "False positive prevention - substring in directory name should NOT be skipped",
+		},
+		{
+			path:        "/project/node_modules/package",
+			shouldSkip:  true,
+			description: "Exact segment match - should be skipped",
+		},
+		{
+			path:        "/project/my-node_modules-backup/src",
+			shouldSkip:  false,
+			description: "False positive prevention - substring should NOT be skipped",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result := shouldSkipPath(tc.path)
+			assert.Equal(t, tc.shouldSkip, result,
+				"Path: %s\nExpected: %v, Got: %v\nDescription: %s",
+				tc.path, tc.shouldSkip, result, tc.description)
 		})
 	}
 }
@@ -271,10 +443,10 @@ func TestExecuteGitCommandSingle(t *testing.T) {
 				tempDir := t.TempDir()
 				gitDir := filepath.Join(tempDir, git.DirName)
 				require.NoError(t, os.Mkdir(gitDir, 0755))
-				
+
 				// Configure mock to return success for status command
 				mockGit.SetOutput("status", "mock status output")
-				
+
 				return tempDir
 			},
 			gitArgs: []string{"status"},
